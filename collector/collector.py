@@ -111,12 +111,11 @@ def _compose(*callbacks: TelemetryCallback) -> TelemetryCallback:
     return _combined
 
 
-def _make_detecting_callback(engine) -> TelemetryCallback:
+def _make_detecting_callback(engine, alert_sink) -> TelemetryCallback:
     """
-    Milestone 6: run every telemetry record through the detection
-    engine and log whatever alerts come back. Real alert persistence
-    arrives in Milestone 7 - for now this just proves the engine
-    reacts correctly to live, ticking telemetry.
+    Run every telemetry record through the detection engine, log every
+    alert produced, and hand it to alert_sink (Milestone 7: persists
+    to Postgres via detection.persistence.make_persisting_alert_sink).
     """
     detection_logger = logging.getLogger("forgesentinel.detection")
 
@@ -130,6 +129,7 @@ def _make_detecting_callback(engine) -> TelemetryCallback:
                 alert.asset_id,
                 alert.description,
             )
+            alert_sink(alert)
 
     return _callback
 
@@ -142,11 +142,13 @@ if __name__ == "__main__":
     )
     # Milestone 4: persist every polled record to Postgres in addition
     # to logging it. Milestone 6: also run it through the detection
-    # engine. Imports are local to __main__ so `collector.py` can still
-    # be imported/tested (Milestone 3 style) by anything that doesn't
-    # need the DB or detection engine.
+    # engine. Milestone 7: persist every alert too. Imports are local
+    # to __main__ so `collector.py` can still be imported/tested
+    # (Milestone 3 style) by anything that doesn't need the DB or
+    # detection engine.
     from collector.persistence import make_persisting_callback
     from detection.engine import build_default_engine
+    from detection.persistence import make_persisting_alert_sink
 
     engine = build_default_engine(expected_poll_interval_seconds=DEFAULT_POLL_SECONDS)
 
@@ -156,6 +158,6 @@ if __name__ == "__main__":
         on_telemetry=_compose(
             log_telemetry,
             make_persisting_callback(asset_ip="127.0.0.1"),
-            _make_detecting_callback(engine),
+            _make_detecting_callback(engine, make_persisting_alert_sink()),
         ),
     )

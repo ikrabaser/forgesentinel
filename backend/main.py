@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from backend.routers import assets, health, telemetry
+from backend.routers import alerts, assets, health, telemetry
 
 app = FastAPI(
     title="ForgeSentinel API",
@@ -22,3 +22,4 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(assets.router, prefix="/api")
 app.include_router(telemetry.router, prefix="/api")
+app.include_router(alerts.router, prefix="/api")

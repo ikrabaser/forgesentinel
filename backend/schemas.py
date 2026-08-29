@@ -55,3 +55,18 @@ class TelemetryOut(BaseModel):
     pump_state: str
     cooling_active: bool
     inlet_open: bool
+
+
+class AlertOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    asset_id: int
+    rule_id: str
+    severity: str
+    title: str
+    description: str
+    status: str
+    created_at: datetime
+    acknowledged_at: datetime | None
+    resolved_at: datetime | None

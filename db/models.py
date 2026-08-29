@@ -26,10 +26,19 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
+
+# Note: unlike Telemetry (which stores pump_state as a plain String,
+# no enum imported here), we deliberately do NOT import
+# detection.models' AlertSeverity/AlertStatus into this file either -
+# same reasoning as pump_state: db/ has zero knowledge of any other
+# package's domain objects, including detection/'s. Alert.severity and
+# Alert.status below are plain strings, validated by whichever
+# application layer produces them (detection/models.py's Alert
+# dataclass, in this case).
 
 
 class AssetType(str, enum.Enum):
@@ -62,6 +71,9 @@ class Asset(Base):
     telemetry: Mapped[list["Telemetry"]] = relationship(
         back_populates="asset", cascade="all, delete-orphan"
     )
+    alerts: Mapped[list["Alert"]] = relationship(
+        back_populates="asset", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
         return f"<Asset {self.asset_code} status={self.status}>"
@@ -85,3 +97,23 @@ class Telemetry(Base):
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
         return f"<Telemetry asset_id={self.asset_id} ts={self.timestamp}>"
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    rule_id: Mapped[str] = mapped_column(String(20), index=True)
+    severity: Mapped[str] = mapped_column(String(10))
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(15), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    asset: Mapped["Asset"] = relationship(back_populates="alerts")
+
+    def __repr__(self) -> str:  # pragma: no cover - debug convenience only
+        return f"<Alert {self.rule_id} asset_id={self.asset_id} status={self.status}>"
