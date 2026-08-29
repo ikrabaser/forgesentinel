@@ -1,25 +1,46 @@
 """
 FastAPI application entry point.
 
-This file's only job is to build the `app` object and wire routers
-into it - it deliberately contains no business logic. Run it with:
+Run it with:
 
     uvicorn backend.main:app --reload
+
+The lifespan context manager starts/stops the TelemetryBroadcaster
+background task alongside the app itself - it needs to be running for
+the whole process lifetime, not scoped to any single request, so it
+doesn't belong behind a route or a Depends().
 """
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from fastapi import FastAPI
 
-from backend.routers import alerts, assets, health, telemetry
+from backend.broadcaster import TelemetryBroadcaster
+from backend.routers import alerts, assets, health, telemetry, ws
+from backend.websocket_manager import manager
+
+broadcaster = TelemetryBroadcaster(connection_manager=manager, poll_seconds=1.0)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    broadcaster.start()
+    yield
+    await broadcaster.stop()
+
 
 app = FastAPI(
     title="ForgeSentinel API",
-    description="Defensive OT/ICS security lab - asset inventory and telemetry API.",
+    description="Defensive OT/ICS security lab - asset inventory, telemetry, and live updates.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.include_router(health.router)
 app.include_router(assets.router, prefix="/api")
 app.include_router(telemetry.router, prefix="/api")
 app.include_router(alerts.router, prefix="/api")
+app.include_router(ws.router)
