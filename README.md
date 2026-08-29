@@ -75,6 +75,25 @@ All rules debounce: a persisting condition raises exactly one alert
 on the transition to "true," not one per poll, and re-arms once the
 condition clears.
 
+## Milestone 7: Alert management
+
+Alerts from the detection engine are now persisted and manageable
+through the API - a full OPEN -> ACKNOWLEDGED -> RESOLVED lifecycle.
+
+```bash
+python -m simulator.modbus.server   # terminal 1
+python -m collector.collector       # terminal 2 - alerts now persist too
+python -m uvicorn backend.main:app --reload   # terminal 3
+```
+
+- `GET /api/alerts?status=OPEN&limit=100` - list, optionally filtered by status
+- `GET /api/alerts/{id}` - one alert
+- `POST /api/alerts/{id}/acknowledge` - OPEN -> ACKNOWLEDGED
+- `POST /api/alerts/{id}/resolve` - OPEN or ACKNOWLEDGED -> RESOLVED
+
+Both actions are no-ops (don't overwrite timestamps) if the alert is
+already past that state.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

@@ -25,7 +25,14 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from db.models import Asset, AssetStatus, Telemetry
+from db.models import Alert, Asset, AssetStatus, Telemetry
+
+# Plain string constants mirroring detection.models.AlertStatus's
+# values - not imported from there, for the same "db/ never imports
+# another package's domain objects" reason explained in db/models.py.
+_STATUS_OPEN = "OPEN"
+_STATUS_ACKNOWLEDGED = "ACKNOWLEDGED"
+_STATUS_RESOLVED = "RESOLVED"
 
 
 class AssetRepository:
@@ -128,3 +135,75 @@ class TelemetryRepository:
             .limit(limit)
         )
         return list(self.session.execute(stmt).scalars().all())
+
+
+class AlertRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def create(
+        self,
+        asset_id: int,
+        rule_id: str,
+        severity: str,
+        title: str,
+        description: str,
+        created_at: datetime,
+    ) -> Alert:
+        alert = Alert(
+            asset_id=asset_id,
+            rule_id=rule_id,
+            severity=severity,
+            title=title,
+            description=description,
+            status=_STATUS_OPEN,
+            created_at=created_at,
+        )
+        self.session.add(alert)
+        self.session.flush()
+        return alert
+
+    def get(self, alert_id: int) -> Alert | None:
+        return self.session.get(Alert, alert_id)
+
+    def list_all(self, status: str | None = None, limit: int = 100) -> list[Alert]:
+        stmt = select(Alert).order_by(Alert.created_at.desc()).limit(limit)
+        if status is not None:
+            stmt = stmt.where(Alert.status == status)
+        return list(self.session.execute(stmt).scalars().all())
+
+    def acknowledge(self, alert_id: int, at: datetime) -> Alert | None:
+        """
+        OPEN -> ACKNOWLEDGED: someone has seen this alert and is
+        looking into it. Deliberately a no-op (returns the alert
+        unchanged) if it's already ACKNOWLEDGED or RESOLVED, rather
+        than silently overwriting acknowledged_at - an alert that was
+        first acknowledged at 09:00 shouldn't have that timestamp
+        quietly bumped to 14:00 because someone clicked the button
+        again. This is a small state machine: OPEN is the only state
+        this transition is valid from.
+        """
+        alert = self.get(alert_id)
+        if alert is None:
+            return None
+        if alert.status == _STATUS_OPEN:
+            alert.status = _STATUS_ACKNOWLEDGED
+            alert.acknowledged_at = at
+            self.session.flush()
+        return alert
+
+    def resolve(self, alert_id: int, at: datetime) -> Alert | None:
+        """
+        OPEN or ACKNOWLEDGED -> RESOLVED. Valid from either state
+        (an operator can resolve something they never explicitly
+        acknowledged first) but a no-op if already RESOLVED, for the
+        same "don't silently overwrite history" reason as acknowledge().
+        """
+        alert = self.get(alert_id)
+        if alert is None:
+            return None
+        if alert.status in (_STATUS_OPEN, _STATUS_ACKNOWLEDGED):
+            alert.status = _STATUS_RESOLVED
+            alert.resolved_at = at
+            self.session.flush()
+        return alert
