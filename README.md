@@ -120,6 +120,28 @@ async def main():
 asyncio.run(main())
 ```
 
+## Milestone 9: React OT SOC dashboard
+
+A dark, technical "security operations center" dashboard - Overview,
+Live Telemetry (animated chart), Alerts (filter + acknowledge/resolve),
+and Assets - built with React, TypeScript, Vite, Tailwind CSS,
+Recharts, and Framer Motion for live-data animation (pulsing status
+dots, animated numbers, alert toasts, smooth page transitions).
+
+```bash
+# terminal 1-3: the usual backend stack
+python -m simulator.modbus.server
+python -m collector.collector
+python -m uvicorn backend.main:app --reload
+
+# terminal 4: frontend dev server (proxies /api and /ws to :8000)
+cd frontend
+npm install
+npm run dev
+```
+
+Then open the printed `http://localhost:<port>/` URL.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

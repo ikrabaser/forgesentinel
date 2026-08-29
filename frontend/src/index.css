@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+/*
+ * ForgeSentinel design tokens: a dark, technical "OT SOC" theme -
+ * closer to a premium product dashboard (Linear/Vercel/Stripe-style
+ * depth and polish) than either a generic admin template or a
+ * marketing landing page. High contrast, monospace for data values, a
+ * single restrained accent color, and severity colors that match the
+ * AlertSeverity values the backend actually returns (LOW/MEDIUM/HIGH/
+ * CRITICAL) so a color always means the same thing everywhere.
+ */
+:root {
+  --bg: #06090f;
+  --bg-panel: rgba(17, 23, 34, 0.72);
+  --bg-panel-raised: rgba(22, 29, 43, 0.85);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #b8bfcf;
+  --text-dim: #6b7690;
+  --text-bright: #f3f5f9;
+
+  --accent: #2dd4bf;
+  --accent-glow: rgba(45, 212, 191, 0.35);
+  --accent-dim: rgba(45, 212, 191, 0.14);
+
+  --severity-low: #7c8aa8;
+  --severity-medium: #eab308;
+  --severity-high: #f97316;
+  --severity-critical: #ef4444;
+
+  --status-online: #2dd4bf;
+  --status-offline: #ef4444;
+
+  --font-sans: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--text-bright);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+/* Glass panel: the single reusable "card" surface every panel in the
+   app is built from - translucent fill + blur so the animated
+   background glow reads through faintly, a soft inner highlight along
+   the top edge, and a subtle outer shadow for lift. This one class
+   doing the work everywhere is what makes the whole app read as one
+   coherent system rather than a pile of ad hoc boxes. */
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+    0 10px 30px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* Fixed, full-viewport animated backdrop: three soft radial glows
+   drifting slowly behind every page. This is the one place motion is
+   purely atmospheric (everything else animates in direct response to
+   data) - it's what keeps a dark, data-dense screen from feeling
+   static/dead during the long stretches where nothing is alerting. */
+.background-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.background-fx::before,
+.background-fx::after,
+.background-fx .fx-blob-3 {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.16;
+}
+.background-fx::before {
+  width: 42vw;
+  height: 42vw;
+  top: -14vw;
+  left: -8vw;
+  background: var(--accent);
+  animation: drift-a 26s ease-in-out infinite;
+}
+.background-fx::after {
+  width: 34vw;
+  height: 34vw;
+  bottom: -12vw;
+  right: -6vw;
+  background: #3b82f6;
+  animation: drift-b 32s ease-in-out infinite;
+}
+.background-fx .fx-blob-3 {
+  width: 26vw;
+  height: 26vw;
+  top: 40%;
+  left: 55%;
+  background: var(--severity-high);
+  opacity: 0.08;
+  animation: drift-a 38s ease-in-out infinite reverse;
+}
+
+@keyframes drift-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6vw, 4vw) scale(1.1);
+  }
+}
+@keyframes drift-b {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-5vw, -6vw) scale(1.08);
+  }
+}
+
+/* Faint technical grid overlay, reminiscent of an HMI schematic
+   background - purely decorative, sits above the color glow but below
+   all real content. */
+.background-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background-fx::before,
+  .background-fx::after,
+  .background-fx .fx-blob-3 {
+    animation: none;
+  }
+}
