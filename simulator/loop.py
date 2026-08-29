@@ -26,7 +26,7 @@ import logging
 import time
 from dataclasses import dataclass
 
-from simulator.plc.plc import PLCController, PLCReadings
+from simulator.plc.plc import PLCController, PLCDecision, PLCReadings
 from simulator.process.pump import Pump, PumpState
 from simulator.process.sensors import PressureSensor, TemperatureSensor
 from simulator.process.tank import Tank
@@ -65,6 +65,10 @@ class Plant:
         self.plc = PLCController()
 
         self.tick_count = 0
+        # Last PLC decision, kept around so external readers (e.g. the
+        # Modbus server in Milestone 2) can report *why* the pump/tank
+        # are in their current state, not just the resulting values.
+        self.last_decision: PLCDecision | None = None
 
     def step(self) -> PLCReadings:
         """Advance the plant by exactly one tick. Returns readings after the tick."""
@@ -76,6 +80,7 @@ class Plant:
             pump_state=self.pump.state,
         )
         decision = self.plc.decide(current_readings)
+        self.last_decision = decision
 
         # 2. Apply decisions to the physical simulation.
         self.pump.set_state(decision.pump_command)
