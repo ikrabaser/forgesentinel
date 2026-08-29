@@ -29,6 +29,19 @@ python -m simulator.loop
 python -m pytest
 ```
 
+## Milestone 4: PostgreSQL persistence
+
+Assets and telemetry are now durably stored in PostgreSQL via
+SQLAlchemy models and Alembic migrations.
+
+```bash
+cp .env.example .env          # defaults already match docker-compose.yml
+docker compose up -d          # starts PostgreSQL on localhost:5432
+python -m alembic upgrade head
+python -m simulator.modbus.server   # terminal 1
+python -m collector.collector       # terminal 2 - now persists to Postgres too
+```
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

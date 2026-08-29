@@ -101,10 +101,30 @@ def run_collector(
         client.close()
 
 
+def _log_and_persist(persisting_callback: TelemetryCallback) -> TelemetryCallback:
+    """Compose the default log callback with a DB-persisting one, log first."""
+
+    def _combined(record: TelemetryRecord) -> None:
+        log_telemetry(record)
+        persisting_callback(record)
+
+    return _combined
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
-    run_collector(host="127.0.0.1", port=5020)
+    # Milestone 4: persist every polled record to Postgres in addition
+    # to logging it. Import is local to __main__ so `collector.py` can
+    # still be imported/tested (Milestone 3 style, no DB required) by
+    # anything that doesn't need persistence.
+    from collector.persistence import make_persisting_callback
+
+    run_collector(
+        host="127.0.0.1",
+        port=5020,
+        on_telemetry=_log_and_persist(make_persisting_callback(asset_ip="127.0.0.1")),
+    )
