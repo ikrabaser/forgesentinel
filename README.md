@@ -58,6 +58,23 @@ Endpoints (interactive docs at `http://127.0.0.1:8000/docs`):
 - `GET /api/telemetry?asset_code=PLC-001&limit=100` - recent telemetry, newest first
 - `GET /api/telemetry/latest?asset_code=PLC-001` - most recent reading
 
+## Milestone 6: Detection engine
+
+Rule-based detection over live telemetry. Rules 001-003 react to
+incoming telemetry; Rule 004 (device offline) is heartbeat-driven -
+see `detection/rules/device_offline.py`. Rule 005 (suspicious
+configuration change) is intentionally NOT implemented yet - see
+`detection/rules/suspicious_configuration_change.py` for why.
+
+```bash
+python -m simulator.modbus.server   # terminal 1
+python -m collector.collector       # terminal 2 - now logs ALERT lines too
+```
+
+All rules debounce: a persisting condition raises exactly one alert
+on the transition to "true," not one per poll, and re-arms once the
+condition clears.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial
