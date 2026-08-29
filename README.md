@@ -42,6 +42,22 @@ python -m simulator.modbus.server   # terminal 1
 python -m collector.collector       # terminal 2 - now persists to Postgres too
 ```
 
+## Milestone 5: FastAPI backend
+
+Read-only HTTP API over the asset inventory and telemetry history.
+
+```bash
+python -m uvicorn backend.main:app --reload
+```
+
+Endpoints (interactive docs at `http://127.0.0.1:8000/docs`):
+
+- `GET /health` - process + database connectivity check
+- `GET /api/assets` - list all known assets
+- `GET /api/assets/{asset_code}` - one asset, e.g. `/api/assets/PLC-001`
+- `GET /api/telemetry?asset_code=PLC-001&limit=100` - recent telemetry, newest first
+- `GET /api/telemetry/latest?asset_code=PLC-001` - most recent reading
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

@@ -1,0 +1,57 @@
+"""
+Pydantic response models: the API's public contract.
+
+These are DELIBERATELY separate classes from db/models.py's SQLAlchemy
+models, even though their fields mostly mirror each other right now.
+Reasons this separation matters (not just boilerplate):
+
+    1. The ORM model is shaped by storage concerns (foreign keys,
+       indexes); the API schema is shaped by what a client should see.
+       They will diverge - e.g. we may never want to expose an
+       internal surrogate `asset.id` primary key to external API
+       consumers as a stable identifier, only `asset_code`.
+    2. `model_config = ConfigDict(from_attributes=True)` lets Pydantic
+       read straight from a SQLAlchemy ORM instance's attributes, so
+       routes can `return` an ORM object directly and FastAPI
+       serializes it through this schema - no manual field-by-field
+       copying.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
+
+
+class HealthOut(BaseModel):
+    status: str  # "ok" or "degraded"
+    database: str  # "ok" or "unreachable"
+
+
+class AssetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    asset_code: str
+    name: str
+    asset_type: str
+    protocol: str | None
+    ip_address: str | None
+    status: str
+    first_seen: datetime
+    last_seen: datetime
+
+
+class TelemetryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    asset_id: int
+    timestamp: datetime
+    temperature: float
+    pressure: float
+    tank_level_percent: float
+    pump_state: str
+    cooling_active: bool
+    inlet_open: bool
