@@ -94,6 +94,32 @@ python -m uvicorn backend.main:app --reload   # terminal 3
 Both actions are no-ops (don't overwrite timestamps) if the alert is
 already past that state.
 
+## Milestone 8: WebSocket live telemetry
+
+The backend now pushes new telemetry and alerts to connected clients
+over `WS /ws/live`, no polling from the browser required. A background
+task (`backend/broadcaster.py`) checks Postgres once a second and
+broadcasts anything new - see that file's docstring for why polling
+the database (not a true collector-to-backend push) is the right call
+right now, without reaching for Redis/Celery early.
+
+```bash
+python -m simulator.modbus.server
+python -m collector.collector
+python -m uvicorn backend.main:app --reload
+```
+
+```python
+import asyncio, websockets, json
+
+async def main():
+    async with websockets.connect("ws://127.0.0.1:8000/ws/live") as ws:
+        while True:
+            print(json.loads(await ws.recv()))
+
+asyncio.run(main())
+```
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial
