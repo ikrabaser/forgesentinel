@@ -1,0 +1,18 @@
+# Custom Suricata rules for ForgeSentinel's simulated Modbus TCP traffic.
+#
+# Why "any write at all" is the right signal here (not a value-based
+# rule like Rules 001-003 in detection/): Modbus TCP has no built-in
+# authentication - any client reaching the port can send a write
+# command, and our PLC will honor it. Nothing in this lab is a
+# legitimate external writer today (see
+# detection/rules/suspicious_configuration_change.py's docstring for
+# the full reasoning - this rule set is that gap's network-layer
+# complement). At the network layer we don't need to know WHAT was
+# written or whether the new value "looks wrong" - the mere presence
+# of a write function code is itself the anomaly.
+
+alert modbus any any -> any any (msg:"FORGESENTINEL-OT unauthorized Modbus WRITE command observed (no legitimate writer exists in this lab)"; modbus: access write; classtype:attempted-admin; sid:1000001; rev:1;)
+
+alert modbus any any -> any any (msg:"FORGESENTINEL-OT Modbus Write Single Register (FC06) - possible direct actuator/setpoint override"; modbus: function 6; classtype:attempted-admin; sid:1000002; rev:1;)
+
+alert modbus any any -> any any (msg:"FORGESENTINEL-OT Modbus Write Multiple Registers (FC16) - possible sensor value spoofing"; modbus: function 16; classtype:attempted-admin; sid:1000003; rev:1;)
