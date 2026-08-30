@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db.models import Alert, Asset, AssetStatus, Telemetry
@@ -46,6 +46,11 @@ class AssetRepository:
     def list_all(self) -> list[Asset]:
         stmt = select(Asset).order_by(Asset.asset_code)
         return list(self.session.execute(stmt).scalars().all())
+
+    def count_online(self) -> int:
+        """Used by backend/routers/metrics.py's forgesentinel_active_assets."""
+        stmt = select(func.count()).select_from(Asset).where(Asset.status == AssetStatus.ONLINE.value)
+        return self.session.execute(stmt).scalar_one()
 
     def upsert_seen(
         self,
@@ -185,6 +190,20 @@ class AlertRepository:
             .limit(1)
         )
         return self.session.execute(stmt).first() is not None
+
+    def count_by_status(self) -> dict[str, int]:
+        """Used by backend/routers/metrics.py's forgesentinel_alerts_total{status=...}."""
+        stmt = select(Alert.status, func.count()).group_by(Alert.status)
+        return dict(self.session.execute(stmt).all())
+
+    def count_open_critical(self) -> int:
+        """Used by backend/routers/metrics.py's forgesentinel_critical_alerts_total."""
+        stmt = (
+            select(func.count())
+            .select_from(Alert)
+            .where(Alert.status == _STATUS_OPEN, Alert.severity == "CRITICAL")
+        )
+        return self.session.execute(stmt).scalar_one()
 
     def list_all(self, status: str | None = None, limit: int = 100) -> list[Alert]:
         stmt = select(Alert).order_by(Alert.created_at.desc()).limit(limit)

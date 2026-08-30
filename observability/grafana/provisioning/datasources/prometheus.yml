@@ -1,0 +1,12 @@
+# Auto-provisions Prometheus as a Grafana datasource on container
+# start - so "docker compose up" gives a working dashboard, not a
+# blank Grafana that needs manual click-through setup that would
+# never be captured in version control.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
