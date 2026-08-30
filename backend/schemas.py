@@ -57,6 +57,18 @@ class TelemetryOut(BaseModel):
     inlet_open: bool
 
 
+class ReportRequestOut(BaseModel):
+    task_id: str
+    status: str
+
+
+class ReportStatusOut(BaseModel):
+    task_id: str
+    status: str  # Celery states: PENDING, STARTED, SUCCESS, FAILURE, RETRY, REVOKED
+    result: dict | None = None
+    error: str | None = None
+
+
 class AlertOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
