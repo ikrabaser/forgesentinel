@@ -197,6 +197,40 @@ worker/beat kept running - Celery Beat noticed the stale `last_seen`
 and raised exactly one CRITICAL `DEVICE_OFFLINE` alert on its own,
 with no further duplicates on later ticks.
 
+## Milestone 11: Prometheus + Grafana
+
+**Application monitoring vs. industrial telemetry - deliberately kept
+separate.** Postgres's telemetry table answers "is the physical
+process healthy" (temperature, pressure, tank level) and drives
+business logic (the detection engine). Prometheus answers a different
+question - "is the ForgeSentinel *software* healthy" (assets online,
+open alerts, Modbus request/error rates) - for a human watching a
+Grafana panel, not for the application to branch on. Mixing the two
+would mean using a short-retention operational metrics store for
+long-term business data, or vice versa.
+
+The collector isn't an HTTP server, so it can't just add a `/metrics`
+route like the backend does - `collector/metrics.py` runs
+prometheus_client's own tiny HTTP server on a separate port (9100).
+
+```bash
+docker compose up -d   # now also starts prometheus (:9090) and grafana (:3000)
+```
+
+- Backend: `GET /metrics` (port 8000) - `forgesentinel_active_assets`,
+  `forgesentinel_alerts_total{status=...}`,
+  `forgesentinel_critical_alerts_total` (Gauges, recomputed fresh from
+  Postgres on every scrape - correct even if the backend ever runs as
+  more than one worker process).
+- Collector: `GET :9100/metrics` - `forgesentinel_modbus_requests_total`,
+  `forgesentinel_collector_errors_total` (Counters, incremented as the
+  poll loop runs).
+- Grafana (`http://localhost:3000`, `admin` / `$GRAFANA_ADMIN_PASSWORD`
+  from `.env`, default `forgesentinel`) auto-provisions the Prometheus
+  datasource and a "ForgeSentinel - Application Health" dashboard on
+  first start - no manual click-through setup, so the whole
+  observability stack is reproducible from the repo alone.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

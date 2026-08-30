@@ -16,6 +16,7 @@ import logging
 import time
 from typing import Callable
 
+from collector.metrics import COLLECTOR_ERRORS_TOTAL, MODBUS_REQUESTS_TOTAL
 from collector.modbus_client import ModbusPLCClient
 from collector.telemetry import TelemetryRecord, decode_telemetry
 
@@ -79,13 +80,16 @@ def run_collector(
             if not connected:
                 connected = client.connect()
                 if not connected:
+                    COLLECTOR_ERRORS_TOTAL.inc()
                     time.sleep(poll_seconds)
                     continue
 
+            MODBUS_REQUESTS_TOTAL.inc()
             raw = client.read_raw()
             if raw is None:
                 # Could be a transient error or a dropped connection;
                 # force a reconnect attempt on the next iteration.
+                COLLECTOR_ERRORS_TOTAL.inc()
                 connected = False
                 time.sleep(poll_seconds)
                 continue
@@ -146,9 +150,16 @@ if __name__ == "__main__":
     # to __main__ so `collector.py` can still be imported/tested
     # (Milestone 3 style) by anything that doesn't need the DB or
     # detection engine.
+    from collector.metrics import start_metrics_server
     from collector.persistence import make_persisting_callback
     from detection.engine import build_default_engine
     from detection.persistence import make_persisting_alert_sink
+
+    # Milestone 11: expose forgesentinel_modbus_requests_total /
+    # forgesentinel_collector_errors_total on their own tiny HTTP
+    # server for Prometheus to scrape - separate from anything the
+    # collector loop itself is doing.
+    start_metrics_server(port=9100)
 
     engine = build_default_engine(expected_poll_interval_seconds=DEFAULT_POLL_SECONDS)
 

@@ -1,0 +1,69 @@
+{
+  "title": "ForgeSentinel - Application Health",
+  "uid": "forgesentinel-app-health",
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Assets",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "forgesentinel_active_assets", "legendFormat": "online" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Open Critical Alerts",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        { "expr": "forgesentinel_critical_alerts_total", "legendFormat": "critical open" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Alerts by Status",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "forgesentinel_alerts_total", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Modbus Requests (rate/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "rate(forgesentinel_modbus_requests_total[1m])", "legendFormat": "requests/s" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Collector Errors (rate/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } }
+      },
+      "targets": [
+        { "expr": "rate(forgesentinel_collector_errors_total[1m])", "legendFormat": "errors/s" }
+      ]
+    }
+  ]
+}
