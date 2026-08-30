@@ -49,6 +49,40 @@ services:
     depends_on:
       - prometheus
 
+  # Milestone 12: offline PCAP analysis, not always-on services - see
+  # network-security/README.md for why (Docker Desktop on Windows
+  # can't live-sniff the collector's loopback traffic). The
+  # "analysis" profile keeps these out of a plain `docker compose up`;
+  # run them explicitly with `docker compose --profile analysis run --rm <name>`.
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: forgesentinel-suricata
+    profiles: ["analysis"]
+    volumes:
+      - ./network-security/pcaps:/pcaps:ro
+      - ./network-security/suricata/rules:/rules:ro
+      - ./network-security/suricata/logs:/var/log/suricata
+    entrypoint:
+      [
+        "suricata",
+        "-r", "/pcaps/malicious-write.pcap",
+        "-l", "/var/log/suricata",
+        "-S", "/rules/forgesentinel-modbus.rules",
+        "--set", "app-layer.protocols.modbus.enabled=yes",
+        "--set", "app-layer.protocols.modbus.detection-ports.dp=5020",
+      ]
+
+  zeek:
+    image: zeek/zeek:latest
+    container_name: forgesentinel-zeek
+    profiles: ["analysis"]
+    working_dir: /logs
+    volumes:
+      - ./network-security/pcaps:/pcaps:ro
+      - ./network-security/zeek/local.zeek:/local.zeek:ro
+      - ./network-security/zeek/logs:/logs
+    entrypoint: ["zeek", "-C", "-r", "/pcaps/malicious-write.pcap", "/local.zeek"]
+
 volumes:
   forgesentinel_pgdata:
   forgesentinel_grafana_data:
