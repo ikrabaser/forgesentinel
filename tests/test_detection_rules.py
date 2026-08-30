@@ -66,6 +66,36 @@ def test_high_temperature_rearms_after_condition_clears():
     assert third is not None
 
 
+def test_high_temperature_hysteresis_suppresses_flapping_at_boundary():
+    """
+    Reproduces the real bug this rule's hysteresis was added to fix:
+    PLCController's cooling logic shares the same 90.0C setpoint, so
+    the simulated plant naturally oscillates just above/below it. A
+    dip to 88C (below the 90C set threshold but above the 85C clear
+    threshold) must NOT re-arm the rule - only a genuine drop below
+    the clear threshold should.
+    """
+    rule = HighTemperatureRule(threshold=90.0, clear_margin=5.0)
+    readings = [95.0, 88.0, 93.0, 87.0, 94.0]  # oscillates around 90, never clears
+    alerts = [rule.evaluate(make_record(temperature=t)) for t in readings]
+
+    assert alerts[0] is not None  # initial rising edge
+    assert all(a is None for a in alerts[1:])  # every later crossing suppressed
+
+
+def test_high_temperature_hysteresis_rearms_after_genuine_clear():
+    rule = HighTemperatureRule(threshold=90.0, clear_margin=5.0)
+    first = rule.evaluate(make_record(temperature=95.0))
+    rule.evaluate(make_record(temperature=88.0))  # dip, but not below clear threshold
+    still_suppressed = rule.evaluate(make_record(temperature=93.0))
+    rule.evaluate(make_record(temperature=80.0))  # genuinely clears (< 85.0)
+    third = rule.evaluate(make_record(temperature=95.0))
+
+    assert first is not None
+    assert still_suppressed is None
+    assert third is not None
+
+
 # --- Rule 002: HIGH_PRESSURE ---
 
 
@@ -80,6 +110,15 @@ def test_high_pressure_fires_when_over_threshold():
 def test_high_pressure_does_not_fire_below_threshold():
     rule = HighPressureRule(threshold=4.0)
     assert rule.evaluate(make_record(pressure=2.0)) is None
+
+
+def test_high_pressure_hysteresis_suppresses_flapping_at_boundary():
+    rule = HighPressureRule(threshold=4.0, clear_margin=0.5)
+    readings = [4.5, 3.8, 4.3, 3.7]  # oscillates around 4.0, never clears below 3.5
+    alerts = [rule.evaluate(make_record(pressure=p)) for p in readings]
+
+    assert alerts[0] is not None
+    assert all(a is None for a in alerts[1:])
 
 
 # --- Rule 003: PROCESS_ANOMALY ---

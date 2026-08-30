@@ -15,6 +15,23 @@ than being reinvented per rule):
     checked, and only reports on the OPEN->true transition (the
     "rising edge"). When the condition later clears, the rule re-arms
     so a future recurrence is reported again as a fresh event.
+
+Why hysteresis (_fire_with_hysteresis) exists too, not just the plain
+rising-edge check above:
+    Rising-edge alone assumes a value crossing a single threshold is a
+    clean, deliberate transition. In practice, a value hovering right
+    at that boundary - exactly what happens here, since PLCController
+    turns cooling on/off at the same 90C setpoint this rule alarms on
+    - crosses back and forth many times in quick succession as the
+    process's own bang-bang control reacts. Naive edge-triggering
+    reports every single crossing as a fresh event: dozens of
+    "HIGH_TEMPERATURE" alerts a minute for what is really one ongoing
+    excursion. This is "alarm flooding", a well-documented real-world
+    ICS/SCADA problem - operators start ignoring alarms once they
+    flood, which is how a genuine incident gets missed. The fix is a
+    deadband: once active, a rule only clears when the value drops
+    past a SECOND, more lenient threshold, not just back below the one
+    that set it off. That gap absorbs the noise around the boundary.
 """
 
 from __future__ import annotations
@@ -44,5 +61,30 @@ class DebouncedTelemetryRule(TelemetryRule):
         was_active = self._active.get(asset_id, False)
         self._active[asset_id] = condition
         if condition and not was_active:
+            return build_alert()
+        return None
+
+    def _fire_with_hysteresis(
+        self,
+        asset_id: str,
+        value: float,
+        set_threshold: float,
+        clear_threshold: float,
+        build_alert: Callable[[], Alert],
+    ) -> Alert | None:
+        """
+        Schmitt-trigger style edge detection: fires the first time
+        `value` rises past `set_threshold`, then stays "active" (no
+        further alerts) until `value` drops past the lower
+        `clear_threshold` - only then can a future rise above
+        `set_threshold` fire again. Requires clear_threshold <
+        set_threshold; the gap between them is the deadband that
+        absorbs noise/oscillation right at the boundary.
+        """
+        was_active = self._active.get(asset_id, False)
+        still_active = value >= clear_threshold if was_active else value > set_threshold
+        self._active[asset_id] = still_active
+
+        if still_active and not was_active:
             return build_alert()
         return None

@@ -75,6 +75,20 @@ All rules debounce: a persisting condition raises exactly one alert
 on the transition to "true," not one per poll, and re-arms once the
 condition clears.
 
+**Hysteresis, not just debouncing, on Rules 001/002.** Plain
+rising-edge debouncing isn't enough when the value oscillates right
+around a single threshold - which HIGH_TEMPERATURE genuinely does
+here, since PLCController's cooling logic shares the same 90.0C
+setpoint this rule alarms on, producing a real ~81C-94C bang-bang
+cycle roughly every 3 seconds. Naive edge-triggering reported a fresh
+alert on every cycle - dozens a minute for one ongoing excursion, a
+textbook ICS "alarm flooding" problem. `_fire_with_hysteresis`
+(`detection/rules/base.py`) fixes this with a wide "all clear"
+threshold (70.0C for temperature, well below the oscillation floor):
+one sustained excursion now raises exactly one OPEN alert, and its
+OPEN -> ACKNOWLEDGED -> RESOLVED lifecycle (Milestone 7) is what
+tracks "is this still ongoing" from there, not repeated re-firing.
+
 ## Milestone 7: Alert management
 
 Alerts from the detection engine are now persisted and manageable
