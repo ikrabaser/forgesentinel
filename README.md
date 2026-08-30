@@ -156,6 +156,47 @@ npm run dev
 
 Then open the printed `http://localhost:<port>/` URL.
 
+## Milestone 10: Redis + Celery
+
+Two concrete gaps neither FastAPI's request/response cycle nor the
+collector's synchronous per-telemetry callbacks could fill:
+
+1. **DEVICE_OFFLINE (Rule 004) never actually ran.** It existed and
+   was tested since Milestone 6, but nothing called it on a timer. A
+   timer *inside* the collector process couldn't fix this properly
+   either - it would die along with the very process it's supposed to
+   notice has died. `tasks/heartbeat.py` runs as a Celery Beat
+   schedule (every 5s), in its own worker process, reading Postgres's
+   `Asset.last_seen` - independent of whether the collector is alive.
+2. **Report generation** (`tasks/reports.py`) can be slow. A FastAPI
+   route running it synchronously would block the HTTP response;
+   instead the route hands it to a Celery worker and returns
+   immediately with a task id to poll.
+
+Redis is Celery's broker + result backend only - Postgres remains the
+system of record.
+
+```bash
+docker compose up -d          # now also starts redis
+python -m alembic upgrade head
+
+# terminal 1-3: the usual backend stack (simulator, collector, API)
+
+# terminal 4
+celery -A tasks.celery_app worker --loglevel=info --pool=solo   # --pool=solo: Windows
+
+# terminal 5
+celery -A tasks.celery_app beat --loglevel=info
+```
+
+- `POST /api/reports/{asset_code}` -> `202 {"task_id": ..., "status": "PENDING"}`
+- `GET /api/reports/{task_id}` -> `{"status": "SUCCESS", "result": {...}}`
+
+**Verified live:** killed the collector process outright while the
+worker/beat kept running - Celery Beat noticed the stale `last_seen`
+and raised exactly one CRITICAL `DEVICE_OFFLINE` alert on its own,
+with no further duplicates on later ticks.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

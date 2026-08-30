@@ -166,6 +166,26 @@ class AlertRepository:
     def get(self, alert_id: int) -> Alert | None:
         return self.session.get(Alert, alert_id)
 
+    def has_open_alert(self, asset_id: int, rule_id: str) -> bool:
+        """
+        Used by tasks/heartbeat.py to debounce DEVICE_OFFLINE alerts
+        across a Celery worker's own restarts - unlike
+        DebouncedTelemetryRule's in-memory `_active` dict (fine for a
+        single long-lived collector process), a Celery worker can be
+        killed and replaced at any time, so "have we already reported
+        this" needs to be answered from Postgres, not from memory.
+        """
+        stmt = (
+            select(Alert.id)
+            .where(
+                Alert.asset_id == asset_id,
+                Alert.rule_id == rule_id,
+                Alert.status == _STATUS_OPEN,
+            )
+            .limit(1)
+        )
+        return self.session.execute(stmt).first() is not None
+
     def list_all(self, status: str | None = None, limit: int = 100) -> list[Alert]:
         stmt = select(Alert).order_by(Alert.created_at.desc()).limit(limit)
         if status is not None:
