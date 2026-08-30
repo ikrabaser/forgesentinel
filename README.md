@@ -231,6 +231,36 @@ docker compose up -d   # now also starts prometheus (:9090) and grafana (:3000)
   first start - no manual click-through setup, so the whole
   observability stack is reproducible from the repo alone.
 
+## Milestone 12: Network security integration
+
+A network-layer (packet-level) view alongside the application-layer
+detection engine - Suricata (rule-based) and Zeek (passive protocol
+logging), both reading a synthetic Modbus TCP `.pcap` rather than
+live-sniffing (Docker Desktop on Windows can't see host loopback
+traffic - see `network-security/README.md` for the full reasoning).
+
+This is deliberately the network-layer complement to Rule 005
+(`detection/rules/suspicious_configuration_change.py`), which
+documented exactly why it couldn't be built at the application layer:
+Modbus has no authentication, so any client's write command is
+inherently suspicious here - a rule the network layer can express
+trivially (`modbus: access write`) without needing to know what value
+was written or why.
+
+```bash
+python network-security/generate_pcaps.py
+docker compose --profile analysis run --rm suricata
+docker compose --profile analysis run --rm zeek
+```
+
+Full walkthrough (including a Wireshark manual-inspection guide) in
+[network-security/README.md](network-security/README.md).
+
+**Verified live:** Suricata raised all 4 expected alerts against the
+malicious capture and zero against the benign one; Zeek's
+`modbus.log` correctly decoded both write function codes with the
+right source/destination/transaction ids.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial
