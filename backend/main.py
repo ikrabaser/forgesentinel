@@ -19,7 +19,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 
 from backend.broadcaster import TelemetryBroadcaster
-from backend.routers import alerts, assets, health, reports, telemetry, ws
+from backend.routers import alerts, assets, health, metrics, reports, telemetry, ws
 from backend.websocket_manager import manager
 
 broadcaster = TelemetryBroadcaster(connection_manager=manager, poll_seconds=1.0)
@@ -40,6 +40,7 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(metrics.router)
 app.include_router(assets.router, prefix="/api")
 app.include_router(telemetry.router, prefix="/api")
 app.include_router(alerts.router, prefix="/api")
