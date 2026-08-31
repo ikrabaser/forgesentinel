@@ -29,7 +29,7 @@ TEST_PORT = 15020  # distinct from the default 5020 to avoid clashing
 
 def _start_server_in_background_thread() -> None:
     def _target() -> None:
-        asyncio.run(run_server(host=TEST_HOST, port=TEST_PORT, tick_seconds=0.1))
+        asyncio.run(run_server(host=TEST_HOST, port=TEST_PORT, tick_seconds=0.1, publish_mqtt=False))
 
     thread = threading.Thread(target=_target, daemon=True)
     thread.start()

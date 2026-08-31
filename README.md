@@ -261,6 +261,35 @@ malicious capture and zero against the benign one; Zeek's
 `modbus.log` correctly decoded both write function codes with the
 right source/destination/transaction ids.
 
+## Milestone 13: MQTT (push vs. pull)
+
+The Modbus server now ALSO publishes every tick over MQTT
+(Mosquitto), so the exact same `Plant` state reaches the outside world
+through two fundamentally different protocol philosophies at once:
+Modbus's pull ("ask me and I'll answer") and MQTT's push ("I'll tell
+you the moment something changes"). See
+`simulator/mqtt/publisher.py`'s docstring for the retain/QoS reasoning.
+
+```bash
+docker compose up -d mosquitto
+python -m simulator.modbus.server   # now publishes to MQTT too
+
+# in another terminal, watch it live (needs the paho-mqtt package):
+python -c "
+import paho.mqtt.client as mqtt
+c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+c.on_message = lambda _c, _u, m: print(m.topic, m.payload.decode())
+c.connect('127.0.0.1', 1883)
+c.subscribe('forgesentinel/PLC-001/telemetry')
+c.loop_forever()
+"
+```
+
+**Verified live:** started the Modbus server with MQTT publishing on,
+confirmed the same tick's temperature matches (within each protocol's
+own rounding) between a real Modbus read and a live MQTT subscription
+- see `tests/test_modbus_server_mqtt.py`.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial
