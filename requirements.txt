@@ -10,3 +10,4 @@ websockets>=12
 celery[redis]>=5.4
 prometheus-client>=0.20
 scapy>=2.5
+paho-mqtt>=2.1
