@@ -290,6 +290,36 @@ confirmed the same tick's temperature matches (within each protocol's
 own rounding) between a real Modbus read and a live MQTT subscription
 - see `tests/test_modbus_server_mqtt.py`.
 
+## Milestone 14: AI Incident Analyst
+
+Claude explains alerts - it never controls the plant. See
+`detection/ai_analyst.py`'s docstring: the module imports nothing from
+`simulator/` and references no Modbus/MQTT client, so there is no code
+path here that could write to the plant even if the model "wanted" to.
+It reads an alert plus the 10 minutes of telemetry leading up to it,
+and returns a structured `summary` / `possible_causes` /
+`recommended_actions` - always investigation steps a human takes, never
+a control command.
+
+```bash
+# .env: set ANTHROPIC_API_KEY=sk-ant-... (get one at https://console.anthropic.com)
+docker compose up -d redis
+celery -A tasks.celery_app worker --loglevel=info   # terminal 1
+uvicorn backend.main:app --reload                    # terminal 2
+
+curl -X POST http://127.0.0.1:8000/api/incidents/analyze/1
+# -> {"task_id": "...", "status": "PENDING"}
+curl http://127.0.0.1:8000/api/incidents/tasks/<task_id>
+# -> {"status": "SUCCESS", "result": {"summary": "...", "possible_causes": [...], "recommended_actions": [...]}}
+curl "http://127.0.0.1:8000/api/incidents?alert_id=1"   # persisted history for that alert
+```
+
+Every test in this milestone mocks the Claude call (see
+`tests/test_incident_analysis_task.py` /
+`tests/test_backend_incidents_api.py`) - no API key is required to run
+the suite. **Live end-to-end verification requires your own
+`ANTHROPIC_API_KEY`** and has not been run in this environment.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial
