@@ -69,6 +69,30 @@ class ReportStatusOut(BaseModel):
     error: str | None = None
 
 
+class IncidentAnalysisRequestOut(BaseModel):
+    task_id: str
+    status: str
+
+
+class IncidentAnalysisTaskStatusOut(BaseModel):
+    task_id: str
+    status: str  # Celery states: PENDING, STARTED, SUCCESS, FAILURE, RETRY, REVOKED
+    result: dict | None = None
+    error: str | None = None
+
+
+class IncidentAnalysisOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    alert_id: int
+    model: str
+    summary: str
+    possible_causes: list[str]
+    recommended_actions: list[str]
+    created_at: datetime
+
+
 class AlertOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
