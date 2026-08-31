@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import socket
 import time
+import uuid
 
 import pytest
 
@@ -39,6 +40,13 @@ def require_broker():
 def test_publish_is_received_by_a_real_subscriber(require_broker):
     import paho.mqtt.client as mqtt
 
+    # Unique per run: publish() sets retain=True, so a FIXED topic
+    # would hand a new subscriber the previous test run's retained
+    # message the instant it subscribes, before our own fresh publish
+    # even happens - the exact bug this once produced two identical
+    # {"hello": "world"} messages instead of one.
+    topic = topic_for(f"TEST-ASSET-{uuid.uuid4().hex[:8]}")
+
     received: list[dict] = []
 
     def _on_message(_client, _userdata, msg):
@@ -47,12 +55,12 @@ def test_publish_is_received_by_a_real_subscriber(require_broker):
     subscriber = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     subscriber.on_message = _on_message
     subscriber.connect(DEFAULT_HOST, DEFAULT_PORT)
-    subscriber.subscribe(topic_for("TEST-ASSET"))
+    subscriber.subscribe(topic)
     subscriber.loop_start()
     try:
         publisher = MqttPublisher(client_id="forgesentinel-test-publisher")
         publisher.connect()
-        publisher.publish(topic_for("TEST-ASSET"), json.dumps({"hello": "world"}))
+        publisher.publish(topic, json.dumps({"hello": "world"}))
 
         deadline = time.time() + 3
         while not received and time.time() < deadline:
