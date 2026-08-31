@@ -26,7 +26,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
@@ -114,6 +114,35 @@ class Alert(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     asset: Mapped["Asset"] = relationship(back_populates="alerts")
+    incident_analyses: Mapped[list["IncidentAnalysis"]] = relationship(
+        back_populates="alert", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
         return f"<Alert {self.rule_id} asset_id={self.asset_id} status={self.status}>"
+
+
+class IncidentAnalysis(Base):
+    """
+    Milestone 14: the AI Incident Analyst's output for one alert, kept
+    as an append-only history rather than overwritten on re-analysis -
+    an operator re-running analysis after gathering more evidence
+    should be able to compare the new explanation against the old one,
+    the same way a human analyst's incident notes accumulate rather
+    than get erased.
+    """
+
+    __tablename__ = "incident_analyses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    alert_id: Mapped[int] = mapped_column(ForeignKey("alerts.id"), index=True)
+    model: Mapped[str] = mapped_column(String(50))
+    summary: Mapped[str] = mapped_column(Text)
+    possible_causes: Mapped[list[str]] = mapped_column(JSON)
+    recommended_actions: Mapped[list[str]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+    alert: Mapped["Alert"] = relationship(back_populates="incident_analyses")
+
+    def __repr__(self) -> str:  # pragma: no cover - debug convenience only
+        return f"<IncidentAnalysis alert_id={self.alert_id} model={self.model}>"
