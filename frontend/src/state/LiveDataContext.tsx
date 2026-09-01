@@ -18,6 +18,11 @@ interface LiveDataValue {
   telemetryByAsset: Record<string, Telemetry>;
   historyByAsset: Record<string, Telemetry[]>;
   liveAlerts: Alert[];
+  /** Wall-clock time (ms) the last WS message of any kind arrived, or
+   *  null before the first one. Purely additive/derived - used for an
+   *  honest "last sync" readout in the header, not part of any
+   *  existing data flow. */
+  lastMessageAt: number | null;
 }
 
 const LiveDataContext = createContext<LiveDataValue | null>(null);
@@ -26,8 +31,10 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
   const [telemetryByAsset, setTelemetryByAsset] = useState<Record<string, Telemetry>>({});
   const [historyByAsset, setHistoryByAsset] = useState<Record<string, Telemetry[]>>({});
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
+  const [lastMessageAt, setLastMessageAt] = useState<number | null>(null);
 
   const handleMessage = useCallback((message: LiveMessage) => {
+    setLastMessageAt(Date.now());
     if (message.type === "telemetry") {
       const { asset_code, ...rest } = message;
       // asset_id isn't in the broadcast payload (see api/types.ts) -
@@ -50,8 +57,8 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
   const connectionState = useLiveSocket(handleMessage);
 
   const value = useMemo(
-    () => ({ connectionState, telemetryByAsset, historyByAsset, liveAlerts }),
-    [connectionState, telemetryByAsset, historyByAsset, liveAlerts],
+    () => ({ connectionState, telemetryByAsset, historyByAsset, liveAlerts, lastMessageAt }),
+    [connectionState, telemetryByAsset, historyByAsset, liveAlerts, lastMessageAt],
   );
 
   return <LiveDataContext.Provider value={value}>{children}</LiveDataContext.Provider>;

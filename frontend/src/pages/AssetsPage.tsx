@@ -4,12 +4,7 @@ import { api } from "../api/client";
 import type { Asset } from "../api/types";
 import { StatusDot } from "../components/StatusDot";
 import { useLiveData } from "../state/LiveDataContext";
-
-function timeAgo(iso: string): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  return `${Math.floor(seconds / 60)}m ago`;
-}
+import { timeAgo } from "../lib/time";
 
 export function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
