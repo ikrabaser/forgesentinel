@@ -329,6 +329,49 @@ for a fresh one). The disclaimer under every result restates the same
 rule as the backend: AI-generated analysis for human review only, it
 does not act on the plant.
 
+## Milestone 15: Audit logging
+
+An append-only "who did what, when" record - distinct from Telemetry
+(physical process state) and Alert (detection findings). Nothing
+outside `AuditLogRepository.record()` can create an entry, and there
+is no update/delete method at all: an audit log an application can
+quietly edit isn't a trustworthy one.
+
+Two sources feed it:
+
+1. **API actions** - `POST /api/alerts/{id}/acknowledge`, `/resolve`,
+   and `POST /api/incidents/analyze/{id}` each write an entry
+   (`actor="api-client"` - there's no authentication yet, so this is
+   an honest placeholder, not a real principal, until a future auth
+   milestone).
+2. **Modbus write requests** - `detection/rules/suspicious_configuration_change.py`
+   (Rule 005, still intentionally unimplemented) named this exact gap
+   as its prerequisite: *"a write-audit path on the Modbus server,
+   logging every FC06/16 request"*. `AuditingSlaveContext`
+   (`simulator/modbus/server.py`) now does exactly that - and only
+   that: our own simulator writes registers every tick using fc=3/1
+   (the "read" function codes, by pymodbus convention), so only a
+   genuine external FC06/FC16 write ever reaches the audit log, never
+   our own internal state refresh.
+
+```bash
+python -m simulator.modbus.server   # now audits genuine writes
+python -m uvicorn backend.main:app --reload
+```
+
+- `GET /api/audit-log?action=MODBUS_WRITE&resource_type=plc&limit=100`
+
+**Verified live:** sent a real `write_register(0, 4200)` from a Modbus
+client - it showed up as a single `MODBUS_WRITE` entry
+(`function_name: WRITE_SINGLE_REGISTER`) in `/api/audit-log`, with zero
+pollution from the thousands of internal fc=3 updates the simulator's
+own tick loop makes.
+
+**Known gap:** the Modbus write entries don't capture the writing
+client's source IP - pymodbus's single-shared-context server model
+doesn't expose per-connection info to `setValues()` without deeper
+protocol-layer surgery. Documented, not silently missing.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

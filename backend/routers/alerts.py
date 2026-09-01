@@ -21,8 +21,14 @@ from sqlalchemy.orm import Session
 
 from backend.dependencies import get_db
 from backend.schemas import AlertOut
-from db.repository import AlertRepository
+from db.repository import AlertRepository, AuditLogRepository
 from detection.models import AlertStatus
+
+# Milestone 15: no authentication exists yet, so every API-triggered
+# audit entry is attributed to this literal placeholder actor rather
+# than a real principal. A future auth milestone replaces this with
+# whoever's request it actually was.
+_API_ACTOR = "api-client"
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -47,17 +53,35 @@ def get_alert(alert_id: int, db: Session = Depends(get_db)) -> AlertOut:
 
 @router.post("/{alert_id}/acknowledge", response_model=AlertOut)
 def acknowledge_alert(alert_id: int, db: Session = Depends(get_db)) -> AlertOut:
-    alert = AlertRepository(db).acknowledge(alert_id, datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
+    alert = AlertRepository(db).acknowledge(alert_id, now)
     if alert is None:
         raise HTTPException(status_code=404, detail=f"alert {alert_id} not found")
+    AuditLogRepository(db).record(
+        actor=_API_ACTOR,
+        action="ALERT_ACKNOWLEDGED",
+        resource_type="alert",
+        resource_id=str(alert_id),
+        timestamp=now,
+        details={"resulting_status": alert.status},
+    )
     db.commit()
     return alert
 
 
 @router.post("/{alert_id}/resolve", response_model=AlertOut)
 def resolve_alert(alert_id: int, db: Session = Depends(get_db)) -> AlertOut:
-    alert = AlertRepository(db).resolve(alert_id, datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
+    alert = AlertRepository(db).resolve(alert_id, now)
     if alert is None:
         raise HTTPException(status_code=404, detail=f"alert {alert_id} not found")
+    AuditLogRepository(db).record(
+        actor=_API_ACTOR,
+        action="ALERT_RESOLVED",
+        resource_type="alert",
+        resource_id=str(alert_id),
+        timestamp=now,
+        details={"resulting_status": alert.status},
+    )
     db.commit()
     return alert

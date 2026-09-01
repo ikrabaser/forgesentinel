@@ -36,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Callable
 
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusServerContext, ModbusSlaveContext
 from pymodbus.server import StartAsyncTcpServer
@@ -54,8 +55,46 @@ DEFAULT_PORT = 5020  # 502 is the standard Modbus port but requires
 DEFAULT_TICK_SECONDS = 1.0
 DEFAULT_ASSET_ID = "PLC-001"
 
+# Modbus function codes for the two WRITE request types pymodbus
+# routes through ModbusSlaveContext.setValues(). Every OTHER caller of
+# setValues() in this file (see _updater_loop below) always passes
+# fc=3 or fc=1 - the "read" function codes, by pymodbus convention,
+# even for our own internal updates - so these two values reliably
+# identify a genuine externally-initiated write, never our own tick.
+_WRITE_FUNCTION_CODES = (6, 16)
 
-def build_context() -> ModbusServerContext:
+WriteCallback = Callable[[int, int, list], None]
+
+
+class AuditingSlaveContext(ModbusSlaveContext):
+    """
+    A ModbusSlaveContext that reports genuine external WRITE requests
+    (FC06 write single register, FC16 write multiple registers) to an
+    on_write callback, then behaves exactly like the base class.
+
+    Milestone 15: this is what makes a Modbus write audit-loggable at
+    all - see detection/rules/suspicious_configuration_change.py's
+    docstring, which named exactly this gap ("a write-audit path on
+    the Modbus server, logging every FC06/16 request") as a
+    prerequisite for that rule. on_write is generic (no DB/audit-log
+    knowledge here - see simulator/mqtt/publisher.py and
+    collector/persistence.py for the same "core module stays
+    infrastructure-agnostic, a separate adapter supplies the real
+    callback" pattern used throughout this project) so this class
+    stays trivially testable with a plain Python list as the sink.
+    """
+
+    def __init__(self, *args, on_write: WriteCallback | None = None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._on_write = on_write
+
+    def setValues(self, fc_as_hex: int, address: int, values: list) -> None:
+        if self._on_write is not None and fc_as_hex in _WRITE_FUNCTION_CODES:
+            self._on_write(fc_as_hex, address, values)
+        super().setValues(fc_as_hex, address, values)
+
+
+def build_context(on_write: WriteCallback | None = None) -> ModbusServerContext:
     """
     Build an empty Modbus datastore sized to our register/coil map.
 
@@ -69,10 +108,11 @@ def build_context() -> ModbusServerContext:
     holding_registers = ModbusSequentialDataBlock(0, [0] * mapping.HOLDING_REGISTER_COUNT)
     coils = ModbusSequentialDataBlock(0, [False] * mapping.COIL_COUNT)
 
-    slave_context = ModbusSlaveContext(
+    slave_context = AuditingSlaveContext(
         hr=holding_registers,
         co=coils,
         zero_mode=True,
+        on_write=on_write,
     )
     # single=True: we're simulating exactly one PLC on this server, so
     # every incoming request is answered by the same device context
@@ -153,6 +193,7 @@ async def run_server(
     tick_seconds: float = DEFAULT_TICK_SECONDS,
     asset_id: str = DEFAULT_ASSET_ID,
     publish_mqtt: bool = True,
+    on_write: WriteCallback | None = None,
 ) -> None:
     """
     Start the Modbus TCP server and the background plant-updater task
@@ -163,8 +204,12 @@ async def run_server(
     connection - MqttPublisher already tolerates an unreachable broker
     gracefully, but tests that don't care about MQTT at all shouldn't
     need Mosquitto running just to exercise the Modbus server.
+
+    on_write=None by default (used by most tests) - no audit-log
+    persistence happens unless the caller opts in, same reasoning as
+    publish_mqtt=False.
     """
-    context = build_context()
+    context = build_context(on_write=on_write)
     plant = Plant()
 
     mqtt_publisher: MqttPublisher | None = None
@@ -190,4 +235,13 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
-    asyncio.run(run_server())
+    # Local import so this module stays importable/testable without a
+    # database - same discipline as collector.py's __main__ (see its
+    # comment for why). record_modbus_write is the only piece of this
+    # file that ever touches Postgres.
+    from simulator.modbus.audit import record_modbus_write
+
+    def _on_write(fc: int, address: int, values: list) -> None:
+        record_modbus_write(DEFAULT_ASSET_ID, fc, address, values)
+
+    asyncio.run(run_server(on_write=_on_write))

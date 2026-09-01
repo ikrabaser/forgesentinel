@@ -146,3 +146,46 @@ class IncidentAnalysis(Base):
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
         return f"<IncidentAnalysis alert_id={self.alert_id} model={self.model}>"
+
+
+class AuditLog(Base):
+    """
+    Milestone 15: an immutable record of "who did what, when" for
+    security-relevant actions - distinct from both Telemetry (physical
+    process state) and Alert (detection engine findings). Audit
+    entries answer accountability questions a SOC always gets asked
+    after the fact: who acknowledged this, when was analysis
+    requested, was there ever a write to this PLC's registers.
+
+    No rows are ever updated or deleted by application code - only
+    inserted. That's what makes an audit log trustworthy as a record;
+    a log an application can quietly edit isn't one.
+
+    Two distinct sources feed this table:
+      - API actions (actor="api-client" for now - there is no
+        authentication yet, so we cannot honestly attribute an action
+        to a specific human/service identity beyond "the API was
+        called". A future auth milestone would replace this literal
+        string with a real principal.)
+      - Modbus write commands observed by the PLC simulator (actor=
+        "modbus-client" - see simulator/modbus/server.py's
+        AuditingSlaveContext for how genuine external writes (FC06/16)
+        are distinguished from the simulator's own internal tick
+        updates (FC03/01). Source IP is NOT captured yet - pymodbus's
+        single-context server model doesn't expose per-connection
+        info to setValues() without deeper protocol-layer surgery;
+        documented here as a known gap, not a silent omission.
+    """
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    actor: Mapped[str] = mapped_column(String(100))
+    action: Mapped[str] = mapped_column(String(50), index=True)
+    resource_type: Mapped[str] = mapped_column(String(30), index=True)
+    resource_id: Mapped[str] = mapped_column(String(50))
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    def __repr__(self) -> str:  # pragma: no cover - debug convenience only
+        return f"<AuditLog {self.action} {self.resource_type}:{self.resource_id}>"

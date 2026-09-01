@@ -25,7 +25,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from db.models import Alert, Asset, AssetStatus, IncidentAnalysis, Telemetry
+from db.models import Alert, Asset, AssetStatus, AuditLog, IncidentAnalysis, Telemetry
 
 # Plain string constants mirroring detection.models.AlertStatus's
 # values - not imported from there, for the same "db/ never imports
@@ -309,4 +309,43 @@ class IncidentAnalysisRepository:
             .where(IncidentAnalysis.alert_id == alert_id)
             .order_by(IncidentAnalysis.created_at.desc())
         )
+        return list(self.session.execute(stmt).scalars().all())
+
+
+class AuditLogRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def record(
+        self,
+        actor: str,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        timestamp: datetime,
+        details: dict | None = None,
+    ) -> AuditLog:
+        entry = AuditLog(
+            actor=actor,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            timestamp=timestamp,
+            details=details,
+        )
+        self.session.add(entry)
+        self.session.flush()
+        return entry
+
+    def list_recent(
+        self,
+        limit: int = 100,
+        action: str | None = None,
+        resource_type: str | None = None,
+    ) -> list[AuditLog]:
+        stmt = select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(limit)
+        if action is not None:
+            stmt = stmt.where(AuditLog.action == action)
+        if resource_type is not None:
+            stmt = stmt.where(AuditLog.resource_type == resource_type)
         return list(self.session.execute(stmt).scalars().all())

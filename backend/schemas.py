@@ -106,3 +106,15 @@ class AlertOut(BaseModel):
     created_at: datetime
     acknowledged_at: datetime | None
     resolved_at: datetime | None
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    timestamp: datetime
+    actor: str
+    action: str
+    resource_type: str
+    resource_id: str
+    details: dict | None
