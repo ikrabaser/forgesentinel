@@ -51,3 +51,35 @@ export interface Alert {
 export type LiveMessage =
   | ({ type: "telemetry"; asset_code: string } & Omit<Telemetry, "asset_id">)
   | ({ type: "alert" } & Alert);
+
+// Mirrors backend/schemas.py's IncidentAnalysis* models (Milestone 14).
+export interface IncidentAnalysisRequest {
+  task_id: string;
+  status: string;
+}
+
+// Mirrors detection/ai_analyst.py's IncidentAnalysis Pydantic model -
+// this is Claude's structured output, not a hand-rolled shape.
+export interface IncidentAnalysisResult {
+  summary: string;
+  possible_causes: string[];
+  recommended_actions: string[];
+}
+
+export interface IncidentAnalysisTaskStatus {
+  task_id: string;
+  // Celery states: PENDING, STARTED, SUCCESS, FAILURE, RETRY, REVOKED
+  status: string;
+  result: IncidentAnalysisResult | null;
+  error: string | null;
+}
+
+export interface IncidentAnalysis {
+  id: number;
+  alert_id: number;
+  model: string;
+  summary: string;
+  possible_causes: string[];
+  recommended_actions: string[];
+  created_at: string;
+}

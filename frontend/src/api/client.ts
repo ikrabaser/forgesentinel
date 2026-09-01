@@ -4,7 +4,15 @@
 // themselves. Relative paths (`/api/...`) rely on Vite's dev proxy
 // (see vite.config.ts) so this file never hard-codes a backend host.
 
-import type { Alert, AlertStatus, Asset, Telemetry } from "./types";
+import type {
+  Alert,
+  AlertStatus,
+  Asset,
+  IncidentAnalysis,
+  IncidentAnalysisRequest,
+  IncidentAnalysisTaskStatus,
+  Telemetry,
+} from "./types";
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path);
@@ -41,4 +49,17 @@ export const api = {
     ),
   acknowledgeAlert: (id: number) => postJson<Alert>(`/api/alerts/${id}/acknowledge`),
   resolveAlert: (id: number) => postJson<Alert>(`/api/alerts/${id}/resolve`),
+
+  // Milestone 14 - AI Incident Analyst. requestIncidentAnalysis kicks
+  // off a Celery task (POST) and returns immediately with a task_id;
+  // getIncidentAnalysisTask polls Celery's result backend for that
+  // task's status. Once it's SUCCESS, the result is also durably
+  // stored - listIncidentAnalyses reads that back from Postgres later
+  // without needing the (by-then-expired) Celery task id.
+  requestIncidentAnalysis: (alertId: number) =>
+    postJson<IncidentAnalysisRequest>(`/api/incidents/analyze/${alertId}`),
+  getIncidentAnalysisTask: (taskId: string) =>
+    getJson<IncidentAnalysisTaskStatus>(`/api/incidents/tasks/${taskId}`),
+  listIncidentAnalyses: (alertId: number) =>
+    getJson<IncidentAnalysis[]>(`/api/incidents?alert_id=${alertId}`),
 };
