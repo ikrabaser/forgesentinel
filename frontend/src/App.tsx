@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -11,8 +12,8 @@ import { AssetsPage } from "./pages/AssetsPage";
 
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "/": {
-    title: "Overview",
-    subtitle: "Plant-wide security posture at a glance",
+    title: "Security Overview",
+    subtitle: "Real-time operational security posture across your infrastructure.",
   },
   "/telemetry": {
     title: "Live Telemetry",
@@ -28,13 +29,13 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   },
 };
 
-function AnimatedRoutes() {
+function AnimatedRoutes({ onMenuClick }: { onMenuClick: () => void }) {
   const location = useLocation();
   const meta = PAGE_META[location.pathname] ?? { title: "ForgeSentinel", subtitle: "" };
 
   return (
     <>
-      <TopBar title={meta.title} subtitle={meta.subtitle} />
+      <TopBar title={meta.title} subtitle={meta.subtitle} onMenuClick={onMenuClick} />
       <div className="relative z-10 flex-1 overflow-y-auto">
         <AnimatePresence mode="wait">
           <motion.div
@@ -58,12 +59,26 @@ function AnimatedRoutes() {
 }
 
 export function App() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const location = useLocation();
+  const [lastPathname, setLastPathname] = useState(location.pathname);
+
+  // Close the mobile nav drawer automatically whenever the route
+  // changes, so picking a page also dismisses the overlay. Adjusted
+  // during render (React's recommended pattern for state derived
+  // from a prop/route change) rather than in an Effect, so it takes
+  // effect in the same render instead of triggering an extra one.
+  if (location.pathname !== lastPathname) {
+    setLastPathname(location.pathname);
+    setMobileNavOpen(false);
+  }
+
   return (
-    <div className="relative flex h-full">
+    <div className="relative flex h-full overflow-hidden">
       <BackgroundFX />
-      <Sidebar />
-      <div className="relative z-10 flex flex-1 flex-col">
-        <AnimatedRoutes />
+      <Sidebar open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
+        <AnimatedRoutes onMenuClick={() => setMobileNavOpen(true)} />
       </div>
       <AlertToastStack />
     </div>
