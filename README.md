@@ -320,6 +320,15 @@ Every test in this milestone mocks the Claude call (see
 the suite. **Live end-to-end verification requires your own
 `ANTHROPIC_API_KEY`** and has not been run in this environment.
 
+**Dashboard integration:** each row on the Alerts page has an expand
+chevron that reveals `IncidentAnalysisPanel` - "Analyze with AI"
+requests an analysis, polls the Celery task to completion, and renders
+the result in place (with a "Re-analyze" option and a persisted-history
+lookup, so re-opening an alert reuses a prior run instead of re-paying
+for a fresh one). The disclaimer under every result restates the same
+rule as the backend: AI-generated analysis for human review only, it
+does not act on the plant.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

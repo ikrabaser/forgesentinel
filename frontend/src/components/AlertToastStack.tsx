@@ -56,33 +56,33 @@ export function AlertToastStack() {
   const overflow = visible.length - shown.length;
 
   return (
-    <div className="pointer-events-none fixed right-4 top-20 z-50 flex w-80 flex-col gap-2">
+    <div className="pointer-events-none fixed right-4 top-[76px] z-50 flex w-72 flex-col gap-2">
       <AnimatePresence>
         {shown.map((alert) => (
           <motion.div
             key={alert.id}
             layout
-            initial={{ opacity: 0, x: 40, scale: 0.95 }}
+            initial={{ opacity: 0, x: 32, scale: 0.97 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 40, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            className="glass-panel pointer-events-auto rounded-xl border border-[var(--border-strong)] p-3.5 shadow-2xl shadow-black/50"
+            exit={{ opacity: 0, x: 32, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 320, damping: 30 }}
+            className="glass-panel pointer-events-auto rounded-[var(--radius-md)] border border-[var(--border-strong)] p-3"
           >
-            <div className="mb-1.5 flex items-center justify-between gap-2">
+            <div className="mb-1 flex items-center justify-between gap-2">
               <SeverityBadge severity={alert.severity} />
-              <span className="font-mono text-[10px] text-[var(--text-dim)]">
+              <span className="font-mono text-[10px] text-[var(--text-tertiary)]">
                 {alert.rule_id}
               </span>
             </div>
-            <div className="text-sm font-medium text-[var(--text-bright)]">{alert.title}</div>
-            <div className="mt-0.5 line-clamp-2 text-xs text-[var(--text-dim)]">
+            <div className="text-[13px] font-medium text-[var(--text-primary)]">{alert.title}</div>
+            <div className="mt-0.5 line-clamp-2 text-[12px] text-[var(--text-secondary)]">
               {alert.description}
             </div>
           </motion.div>
         ))}
       </AnimatePresence>
       {overflow > 0 && (
-        <div className="pointer-events-none text-right font-mono text-[11px] text-[var(--text-dim)]">
+        <div className="pointer-events-none text-right font-mono text-[11px] text-[var(--text-tertiary)]">
           +{overflow} more
         </div>
       )}

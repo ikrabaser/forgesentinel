@@ -13,12 +13,9 @@ import type { Telemetry } from "../api/types";
 import { AnimatedNumber } from "../components/AnimatedNumber";
 import { StatCard } from "../components/StatCard";
 import { useLiveData } from "../state/LiveDataContext";
+import { formatClockTime } from "../lib/time";
 
 const ASSET_CODE = "PLC-001"; // single-asset lab for now (see README)
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour12: false });
-}
 
 export function TelemetryPage() {
   const [history, setHistory] = useState<Telemetry[]>([]);
@@ -38,7 +35,7 @@ export function TelemetryPage() {
     for (const row of [...history, ...liveHistory]) byId.set(row.id, row);
     return [...byId.values()]
       .sort((a, b) => a.id - b.id)
-      .map((row) => ({ ...row, time: formatTime(row.timestamp) }));
+      .map((row) => ({ ...row, time: formatClockTime(row.timestamp) }));
   }, [history, liveHistory]);
 
   const latest = current ?? chartData.at(-1);

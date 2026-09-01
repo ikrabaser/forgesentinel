@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import { api } from "../api/client";
-import type { Alert, Asset } from "../api/types";
+import type { Alert, AlertSeverity, Asset } from "../api/types";
 import { StatCard } from "../components/StatCard";
-import { SeverityBadge } from "../components/SeverityBadge";
 import { StatusDot } from "../components/StatusDot";
+import { SecurityPostureCard } from "../components/SecurityPostureCard";
+import { ThreatBreakdown } from "../components/ThreatBreakdown";
+import { IncidentFeed } from "../components/IncidentFeed";
+import { ServerIcon, RadioIcon, AlertTriangleIcon, ShieldAlertIcon } from "../components/icons";
 import { useLiveData } from "../state/LiveDataContext";
 
 const LATEST_ALERTS_SHOWN = 10;
@@ -13,6 +15,18 @@ const LATEST_ALERTS_SHOWN = 10;
 // open alerts, not a true unbounded count. That's still a world away
 // from the bug this replaced - see below.
 const OPEN_ALERTS_STAT_LIMIT = 200;
+
+function countBySeverity(alerts: Alert[]): Record<AlertSeverity, number> {
+  const counts: Record<AlertSeverity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+  for (const alert of alerts) counts[alert.severity]++;
+  return counts;
+}
+
+/** Trims a trailing ".0" (100.0 -> 100) without rounding away real
+ *  precision (66.7 stays 66.7). */
+function formatPercent(value: number): string {
+  return Number(value.toFixed(1)).toString();
+}
 
 export function OverviewPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -44,10 +58,11 @@ export function OverviewPage() {
     return [...byId.values()].sort((a, b) => b.id - a.id).slice(0, LATEST_ALERTS_SHOWN);
   }, [recentAlerts, liveAlerts]);
 
-  // Stat cards: a SEPARATE, un-truncated merge - counting from the
-  // same list the display slices from was the original bug here
-  // (`.slice(0, 10)` then `.length` silently caps the stat at 10 the
-  // moment there are 10+ open alerts, no matter how many more arrive).
+  // Stat cards + posture/breakdown: a SEPARATE, un-truncated merge -
+  // counting from the same list the display slices from was the
+  // original bug here (`.slice(0, 10)` then `.length` silently caps
+  // the stat at 10 the moment there are 10+ open alerts, no matter
+  // how many more arrive).
   const openAlertsForStats = useMemo(() => {
     const byId = new Map<number, Alert>();
     for (const alert of openAlertsSnapshot) byId.set(alert.id, alert);
@@ -58,71 +73,75 @@ export function OverviewPage() {
     return [...byId.values()];
   }, [openAlertsSnapshot, liveAlerts]);
 
+  const severityCounts = useMemo(() => countBySeverity(openAlertsForStats), [openAlertsForStats]);
   const onlineCount = assets.filter((a) => a.status === "ONLINE").length;
-  const criticalCount = openAlertsForStats.filter((a) => a.severity === "CRITICAL").length;
+  const onlinePct = assets.length > 0 ? (onlineCount / assets.length) * 100 : null;
+  const activeAlertsCount = openAlertsForStats.length;
 
   if (loading) {
-    return <div className="p-8 text-sm text-[var(--text-dim)]">Loading…</div>;
+    return <div className="p-8 text-sm text-[var(--text-tertiary)]">Loading…</div>;
   }
 
   return (
-    <div className="flex flex-col gap-6 p-8">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Assets" value={assets.length} index={0} />
+    <div className="flex flex-col gap-5 p-6 sm:p-8">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Assets"
+          value={assets.length}
+          hint="Protected devices"
+          icon={<ServerIcon className="h-4 w-4" />}
+          index={0}
+        />
         <StatCard
           label="Online"
           value={
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2.5">
               <StatusDot online={onlineCount > 0} />
               {onlineCount}
             </span>
           }
+          hint={onlinePct !== null ? `${formatPercent(onlinePct)}% operational` : undefined}
+          icon={<RadioIcon className="h-4 w-4" />}
           index={1}
         />
         <StatCard
           label="Active Alerts"
-          value={openAlertsForStats.length}
-          tone={openAlertsForStats.length > 0 ? "high" : "default"}
+          value={activeAlertsCount}
+          hint={
+            activeAlertsCount === 0
+              ? "No alerts require review"
+              : `${activeAlertsCount} require${activeAlertsCount === 1 ? "s" : ""} review`
+          }
+          icon={<AlertTriangleIcon className="h-4 w-4" />}
+          tone={activeAlertsCount > 0 ? "high" : "default"}
           index={2}
         />
         <StatCard
           label="Critical"
-          value={criticalCount}
-          tone={criticalCount > 0 ? "critical" : "default"}
+          value={severityCounts.CRITICAL}
+          hint={severityCounts.CRITICAL > 0 ? "Requires immediate attention" : "No critical incidents"}
+          icon={<ShieldAlertIcon className="h-4 w-4" />}
+          tone={severityCounts.CRITICAL > 0 ? "critical" : "default"}
           index={3}
         />
       </div>
 
-      <div className="glass-panel rounded-xl border border-[var(--border)]">
-        <div className="border-b border-[var(--border)] px-6 py-4 text-sm font-semibold text-[var(--text-bright)]">
-          Latest Alerts
-        </div>
-        <div className="divide-y divide-[var(--border)]">
-          {latestAlerts.length === 0 && (
-            <div className="px-5 py-6 text-sm text-[var(--text-dim)]">No alerts recorded yet.</div>
-          )}
-          {latestAlerts.map((alert, i) => (
-            <motion.div
-              key={alert.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: i * 0.02 }}
-              className="flex items-center gap-4 px-5 py-3"
-            >
-              <SeverityBadge severity={alert.severity} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm text-[var(--text-bright)]">{alert.title}</div>
-                <div className="truncate text-xs text-[var(--text-dim)]">
-                  {alert.description}
-                </div>
-              </div>
-              <span className="shrink-0 font-mono text-[11px] text-[var(--text-dim)]">
-                {alert.status}
-              </span>
-            </motion.div>
-          ))}
-        </div>
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[13fr_7fr]">
+        <SecurityPostureCard
+          critical={severityCounts.CRITICAL}
+          high={severityCounts.HIGH}
+          medium={severityCounts.MEDIUM}
+          low={severityCounts.LOW}
+        />
+        <ThreatBreakdown
+          critical={severityCounts.CRITICAL}
+          high={severityCounts.HIGH}
+          medium={severityCounts.MEDIUM}
+          low={severityCounts.LOW}
+        />
       </div>
+
+      <IncidentFeed alerts={latestAlerts} assets={assets} />
     </div>
   );
 }

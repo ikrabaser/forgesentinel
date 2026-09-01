@@ -2,7 +2,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Alert, AlertStatus } from "../api/types";
+import { IncidentAnalysisPanel } from "../components/IncidentAnalysisPanel";
 import { SeverityBadge } from "../components/SeverityBadge";
+import { ChevronRightIcon } from "../components/icons";
 import { useLiveData } from "../state/LiveDataContext";
 
 const FILTERS: (AlertStatus | "ALL")[] = ["ALL", "OPEN", "ACKNOWLEDGED", "RESOLVED"];
@@ -11,6 +13,7 @@ export function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filter, setFilter] = useState<AlertStatus | "ALL">("OPEN");
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const { liveAlerts } = useLiveData();
 
   useEffect(() => {
@@ -48,10 +51,10 @@ export function AlertsPage() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`rounded px-3 py-1.5 font-mono text-xs transition-colors ${
+            className={`rounded px-3 py-1.5 font-mono text-xs transition-colors duration-200 ${
               filter === f
                 ? "bg-[var(--accent-dim)] text-[var(--accent)]"
-                : "text-[var(--text-dim)] hover:bg-[var(--bg-panel-raised)]"
+                : "text-[var(--text-tertiary)] hover:bg-white/[0.035]"
             }`}
           >
             {f}
@@ -59,59 +62,86 @@ export function AlertsPage() {
         ))}
       </div>
 
-      <div className="glass-panel rounded-xl border border-[var(--border)]">
+      <div className="glass-panel rounded-[var(--radius-lg)] border border-[var(--border)]">
         <AnimatePresence initial={false}>
           {visible.length === 0 && (
-            <div className="px-5 py-8 text-center text-sm text-[var(--text-dim)]">
+            <div className="px-5 py-8 text-center text-sm text-[var(--text-tertiary)]">
               No alerts match this filter.
             </div>
           )}
-          {visible.map((alert) => (
-            <motion.div
-              key={alert.id}
-              layout
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex items-center gap-4 border-b border-[var(--border)] px-5 py-3 last:border-b-0"
-            >
-              <SeverityBadge severity={alert.severity} />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-[var(--text-bright)]">{alert.title}</div>
-                <div className="truncate text-xs text-[var(--text-dim)]">
-                  {alert.description}
-                </div>
-              </div>
-              <span className="shrink-0 font-mono text-[10px] text-[var(--text-dim)]">
-                {alert.rule_id}
-              </span>
-              <div className="flex shrink-0 gap-2">
-                {alert.status === "OPEN" && (
-                  <button
-                    disabled={busyId === alert.id}
-                    onClick={() => handleAction(alert, "acknowledge")}
-                    className="rounded border border-[var(--border-strong)] px-2.5 py-1 text-xs text-[var(--text)] transition-colors hover:bg-[var(--bg-panel-raised)] disabled:opacity-40"
-                  >
-                    Acknowledge
-                  </button>
-                )}
-                {alert.status !== "RESOLVED" && (
-                  <button
-                    disabled={busyId === alert.id}
-                    onClick={() => handleAction(alert, "resolve")}
-                    className="rounded border border-[var(--accent)]/40 bg-[var(--accent-dim)] px-2.5 py-1 text-xs text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20 disabled:opacity-40"
-                  >
-                    Resolve
-                  </button>
-                )}
-                {alert.status === "RESOLVED" && (
-                  <span className="px-2.5 py-1 font-mono text-[11px] text-[var(--text-dim)]">
-                    RESOLVED
+          {visible.map((alert) => {
+            const expanded = expandedId === alert.id;
+            return (
+              <motion.div
+                key={alert.id}
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="border-b border-[var(--border)] last:border-b-0"
+              >
+                <div className="flex items-center gap-4 px-5 py-3">
+                  <SeverityBadge severity={alert.severity} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm text-[var(--text-primary)]">{alert.title}</div>
+                    <div className="truncate text-xs text-[var(--text-tertiary)]">
+                      {alert.description}
+                    </div>
+                  </div>
+                  <span className="shrink-0 font-mono text-[10px] text-[var(--text-tertiary)]">
+                    {alert.rule_id}
                   </span>
-                )}
-              </div>
-            </motion.div>
-          ))}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {alert.status === "OPEN" && (
+                      <button
+                        disabled={busyId === alert.id}
+                        onClick={() => handleAction(alert, "acknowledge")}
+                        className="rounded border border-[var(--border-strong)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition-colors duration-200 hover:bg-white/[0.035] disabled:opacity-40"
+                      >
+                        Acknowledge
+                      </button>
+                    )}
+                    {alert.status !== "RESOLVED" && (
+                      <button
+                        disabled={busyId === alert.id}
+                        onClick={() => handleAction(alert, "resolve")}
+                        className="rounded border border-[var(--accent)]/40 bg-[var(--accent-dim)] px-2.5 py-1 text-xs text-[var(--accent)] transition-colors duration-200 hover:bg-[var(--accent)]/20 disabled:opacity-40"
+                      >
+                        Resolve
+                      </button>
+                    )}
+                    {alert.status === "RESOLVED" && (
+                      <span className="px-2.5 py-1 font-mono text-[11px] text-[var(--text-tertiary)]">
+                        RESOLVED
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setExpandedId(expanded ? null : alert.id)}
+                      aria-label={expanded ? "Hide AI analysis" : "Show AI analysis"}
+                      className="rounded p-1 text-[var(--text-tertiary)] transition-colors duration-200 hover:text-[var(--accent)]"
+                    >
+                      <ChevronRightIcon
+                        className={`h-4 w-4 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <AnimatePresence>
+                  {expanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden px-5 pb-4"
+                    >
+                      <IncidentAnalysisPanel alertId={alert.id} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
     </div>
