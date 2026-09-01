@@ -100,6 +100,19 @@ def test_request_analysis_round_trip(client, db_session):
     assert body["result"]["possible_causes"] == FAKE_ANALYSIS.possible_causes
 
 
+def test_request_analysis_writes_audit_entry(client, db_session):
+    alert_id = _make_asset_and_alert(db_session)
+
+    response = client.post(f"/api/incidents/analyze/{alert_id}")
+    task_id = response.json()["task_id"]
+
+    audit = client.get("/api/audit-log", params={"action": "INCIDENT_ANALYSIS_REQUESTED"}).json()
+    assert len(audit) == 1
+    assert audit[0]["resource_type"] == "alert"
+    assert audit[0]["resource_id"] == str(alert_id)
+    assert audit[0]["details"] == {"task_id": task_id}
+
+
 def test_request_analysis_for_unknown_alert_completes_with_error_payload(client):
     post_response = client.post("/api/incidents/analyze/999999")
     task_id = post_response.json()["task_id"]
