@@ -49,6 +49,14 @@ services:
     depends_on:
       - prometheus
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: forgesentinel-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
   # Milestone 12: offline PCAP analysis, not always-on services - see
   # network-security/README.md for why (Docker Desktop on Windows
   # can't live-sniff the collector's loopback traffic). The

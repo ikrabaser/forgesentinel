@@ -33,7 +33,7 @@ def _counter_value(counter) -> float:
 @pytest.fixture(scope="module")
 def modbus_server():
     def _target() -> None:
-        asyncio.run(run_server(host=TEST_HOST, port=TEST_PORT, tick_seconds=0.1))
+        asyncio.run(run_server(host=TEST_HOST, port=TEST_PORT, tick_seconds=0.1, publish_mqtt=False))
 
     threading.Thread(target=_target, daemon=True).start()
     time.sleep(1.0)

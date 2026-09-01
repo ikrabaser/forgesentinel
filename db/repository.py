@@ -25,7 +25,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from db.models import Alert, Asset, AssetStatus, Telemetry
+from db.models import Alert, Asset, AssetStatus, IncidentAnalysis, Telemetry
 
 # Plain string constants mirroring detection.models.AlertStatus's
 # values - not imported from there, for the same "db/ never imports
@@ -246,3 +246,67 @@ class AlertRepository:
             alert.resolved_at = at
             self.session.flush()
         return alert
+
+
+class TelemetryHistoryRepository:
+    """
+    Split out from TelemetryRepository deliberately: `list_recent`
+    there already exists for a different purpose (an API/dashboard
+    page listing raw rows most-recent-first). The AI analyst needs the
+    OPPOSITE order - oldest-first, "how did we get here" - and a
+    bounded lookback WINDOW rather than a row-count limit, since a
+    trend that's meaningful to a human analyst is "what happened in
+    the last N minutes", not "the last N rows" (which could span
+    seconds or days depending on collector uptime). Reusing
+    TelemetryRepository.list_recent and reversing it in the caller
+    would work, but would leave that AI-specific reasoning scattered
+    outside the repository layer.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def history_since(self, asset_id: int, since: datetime) -> list[Telemetry]:
+        stmt = (
+            select(Telemetry)
+            .where(Telemetry.asset_id == asset_id, Telemetry.timestamp >= since)
+            .order_by(Telemetry.timestamp.asc())
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+
+class IncidentAnalysisRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def create(
+        self,
+        alert_id: int,
+        model: str,
+        summary: str,
+        possible_causes: list[str],
+        recommended_actions: list[str],
+        created_at: datetime,
+    ) -> IncidentAnalysis:
+        analysis = IncidentAnalysis(
+            alert_id=alert_id,
+            model=model,
+            summary=summary,
+            possible_causes=possible_causes,
+            recommended_actions=recommended_actions,
+            created_at=created_at,
+        )
+        self.session.add(analysis)
+        self.session.flush()
+        return analysis
+
+    def get(self, analysis_id: int) -> IncidentAnalysis | None:
+        return self.session.get(IncidentAnalysis, analysis_id)
+
+    def list_for_alert(self, alert_id: int) -> list[IncidentAnalysis]:
+        stmt = (
+            select(IncidentAnalysis)
+            .where(IncidentAnalysis.alert_id == alert_id)
+            .order_by(IncidentAnalysis.created_at.desc())
+        )
+        return list(self.session.execute(stmt).scalars().all())
