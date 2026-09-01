@@ -142,3 +142,15 @@ export function InboxIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** Used only on the AI Incident Analyst trigger/panel (Milestone 14) -
+ *  a distinct glyph so an AI-generated explanation is visually
+ *  unmistakable from anything the system itself asserts as fact. */
+export function SparklesIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 4.5 13.4 9l4.6 1.4-4.6 1.4L12 16.3 10.6 11.8 6 10.4l4.6-1.4z" />
+      <path d="M19 4v3M17.5 5.5h3" />
+    </svg>
+  );
+}
