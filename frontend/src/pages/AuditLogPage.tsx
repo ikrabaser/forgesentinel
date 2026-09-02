@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { AuditLogEntry } from "../api/types";
 import { ActionBadge } from "../components/ActionBadge";
 import { ChevronRightIcon, InboxIcon } from "../components/icons";
+import { TableSkeleton } from "../components/TableSkeleton";
 import { formatClockTime, timeAgo } from "../lib/time";
 
 const ACTIONS = [
@@ -75,7 +76,9 @@ export function AuditLogPage() {
       </div>
 
       <div className="glass-panel overflow-hidden rounded-xl border border-[var(--border)]">
-        {!loading && entries.length === 0 ? (
+        {loading ? (
+          <TableSkeleton rows={6} columns={5} leadingIconColumn />
+        ) : entries.length === 0 ? (
           <EmptyState />
         ) : (
           <table className="w-full text-left text-sm">

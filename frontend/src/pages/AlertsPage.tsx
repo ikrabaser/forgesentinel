@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { Alert, AlertStatus } from "../api/types";
 import { IncidentAnalysisPanel } from "../components/IncidentAnalysisPanel";
 import { SeverityBadge } from "../components/SeverityBadge";
+import { TableSkeleton } from "../components/TableSkeleton";
 import { ChevronRightIcon } from "../components/icons";
 import { useLiveData } from "../state/LiveDataContext";
 
@@ -11,13 +12,17 @@ const FILTERS: (AlertStatus | "ALL")[] = ["ALL", "OPEN", "ACKNOWLEDGED", "RESOLV
 
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<AlertStatus | "ALL">("OPEN");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const { liveAlerts } = useLiveData();
 
   useEffect(() => {
-    api.listAlerts(undefined, 200).then(setAlerts);
+    api
+      .listAlerts(undefined, 200)
+      .then(setAlerts)
+      .finally(() => setLoading(false));
   }, []);
 
   const combined = useMemo(() => {
@@ -63,13 +68,15 @@ export function AlertsPage() {
       </div>
 
       <div className="glass-panel rounded-[var(--radius-lg)] border border-[var(--border)]">
+        {loading && <TableSkeleton rows={5} columns={4} />}
         <AnimatePresence initial={false}>
-          {visible.length === 0 && (
+          {!loading && visible.length === 0 && (
             <div className="px-5 py-8 text-center text-sm text-[var(--text-tertiary)]">
               No alerts match this filter.
             </div>
           )}
-          {visible.map((alert) => {
+          {!loading &&
+            visible.map((alert) => {
             const expanded = expandedId === alert.id;
             return (
               <motion.div
