@@ -33,6 +33,7 @@ export function AuditLogPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [highlightedIds, setHighlightedIds] = useState<Set<number>>(new Set());
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Ids already seen at least once, so we can tell "genuinely new
   // since the last poll" apart from "the initial load" - flashing
@@ -67,6 +68,7 @@ export function AuditLogPage() {
 
           setEntries(data);
           setLoading(false);
+          setLastUpdated(new Date());
         })
         .catch(() => {
           if (!cancelled) setLoading(false);
@@ -97,7 +99,8 @@ export function AuditLogPage() {
           options={RESOURCE_TYPES as unknown as string[]}
         />
         <span className="ml-auto text-[11px] text-[var(--text-tertiary)]">
-          {entries.length} {entries.length === 1 ? "entry" : "entries"} · refreshes every{" "}
+          {entries.length} {entries.length === 1 ? "entry" : "entries"}
+          {lastUpdated && <> · updated {timeAgo(lastUpdated.toISOString())}</>} · refreshes every{" "}
           {POLL_MS / 1000}s
         </span>
       </div>
