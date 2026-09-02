@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api } from "../api/client";
 import type { AuditLogEntry } from "../api/types";
@@ -21,6 +21,9 @@ const RESOURCE_TYPES = ["alert", "plc"] as const;
 // widening that for one monitoring page isn't worth the coupling
 // right now. A 4s poll keeps this page reasonably fresh without it.
 const POLL_MS = 4000;
+// How long a newly-arrived row keeps its "just landed" highlight
+// before fading back to the normal row style.
+const HIGHLIGHT_MS = 2500;
 
 export function AuditLogPage() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
@@ -28,6 +31,14 @@ export function AuditLogPage() {
   const [resourceType, setResourceType] = useState<string>("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [highlightedIds, setHighlightedIds] = useState<Set<number>>(new Set());
+
+  // Ids already seen at least once, so we can tell "genuinely new
+  // since the last poll" apart from "the initial load" - flashing
+  // every row the first time the page opens would be noise, not a
+  // signal. Not reset on filter change on purpose: switching filters
+  // reveals rows that already existed, which isn't "new" either.
+  const seenIds = useRef<Set<number> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,10 +47,25 @@ export function AuditLogPage() {
       api
         .listAuditLog({ action: action || undefined, resourceType: resourceType || undefined })
         .then((data) => {
-          if (!cancelled) {
-            setEntries(data);
-            setLoading(false);
+          if (cancelled) return;
+
+          if (seenIds.current !== null) {
+            const freshlyArrived = data.filter((e) => !seenIds.current!.has(e.id)).map((e) => e.id);
+            if (freshlyArrived.length > 0) {
+              setHighlightedIds((prev) => new Set([...prev, ...freshlyArrived]));
+              window.setTimeout(() => {
+                setHighlightedIds((prev) => {
+                  const next = new Set(prev);
+                  for (const id of freshlyArrived) next.delete(id);
+                  return next;
+                });
+              }, HIGHLIGHT_MS);
+            }
           }
+          seenIds.current = new Set(data.map((e) => e.id));
+
+          setEntries(data);
+          setLoading(false);
         })
         .catch(() => {
           if (!cancelled) setLoading(false);
@@ -100,6 +126,7 @@ export function AuditLogPage() {
                     entry={entry}
                     index={i}
                     expanded={expanded}
+                    isNew={highlightedIds.has(entry.id)}
                     onToggle={() => setExpandedId(expanded ? null : entry.id)}
                   />
                 );
@@ -116,11 +143,13 @@ function AuditRow({
   entry,
   index,
   expanded,
+  isNew,
   onToggle,
 }: {
   entry: AuditLogEntry;
   index: number;
   expanded: boolean;
+  isNew: boolean;
   onToggle: () => void;
 }) {
   const hasDetails = entry.details !== null && Object.keys(entry.details).length > 0;
@@ -129,8 +158,17 @@ function AuditRow({
     <>
       <motion.tr
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: Math.min(index, 12) * 0.02 }}
+        animate={{
+          opacity: 1,
+          backgroundColor: isNew ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "transparent",
+        }}
+        transition={{
+          opacity: { delay: Math.min(index, 12) * 0.02 },
+          // Snap to the highlight almost instantly, then ease back out
+          // over HIGHLIGHT_MS - a fast attack, slow decay is what
+          // reads as "flash" rather than "fade in and out symmetrically".
+          backgroundColor: { duration: isNew ? 0.15 : 1.2, ease: "easeOut" },
+        }}
         onClick={hasDetails ? onToggle : undefined}
         className={`border-b border-[var(--border)] last:border-b-0 ${
           hasDetails ? "cursor-pointer hover:bg-white/[0.02]" : ""
