@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Alert, AlertSeverity, Asset } from "../api/types";
 import { StatCard } from "../components/StatCard";
+import { StatCardSkeleton } from "../components/StatCardSkeleton";
 import { StatusDot } from "../components/StatusDot";
 import { SecurityPostureCard } from "../components/SecurityPostureCard";
 import { ThreatBreakdown } from "../components/ThreatBreakdown";
@@ -79,7 +80,20 @@ export function OverviewPage() {
   const activeAlertsCount = openAlertsForStats.length;
 
   if (loading) {
-    return <div className="p-8 text-sm text-[var(--text-tertiary)]">Loading…</div>;
+    return (
+      <div className="flex flex-col gap-5 p-6 sm:p-8">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[13fr_7fr]">
+          <div className="glass-panel h-48 rounded-[var(--radius-lg)] border border-[var(--border)]" />
+          <div className="glass-panel h-48 rounded-[var(--radius-lg)] border border-[var(--border)]" />
+        </div>
+        <div className="glass-panel h-64 rounded-[var(--radius-lg)] border border-[var(--border)]" />
+      </div>
+    );
   }
 
   return (
