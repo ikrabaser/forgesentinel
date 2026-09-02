@@ -12,6 +12,7 @@ import { api } from "../api/client";
 import type { Telemetry } from "../api/types";
 import { AnimatedNumber } from "../components/AnimatedNumber";
 import { StatCard } from "../components/StatCard";
+import { StatCardSkeleton } from "../components/StatCardSkeleton";
 import { useLiveData } from "../state/LiveDataContext";
 import { formatClockTime } from "../lib/time";
 
@@ -19,10 +20,14 @@ const ASSET_CODE = "PLC-001"; // single-asset lab for now (see README)
 
 export function TelemetryPage() {
   const [history, setHistory] = useState<Telemetry[]>([]);
+  const [loading, setLoading] = useState(true);
   const { telemetryByAsset, historyByAsset } = useLiveData();
 
   useEffect(() => {
-    api.listTelemetry(ASSET_CODE, 50).then((rows) => setHistory([...rows].reverse()));
+    api
+      .listTelemetry(ASSET_CODE, 50)
+      .then((rows) => setHistory([...rows].reverse()))
+      .finally(() => setLoading(false));
   }, []);
 
   const liveHistory = historyByAsset[ASSET_CODE] ?? [];
@@ -39,6 +44,19 @@ export function TelemetryPage() {
   }, [history, liveHistory]);
 
   const latest = current ?? chartData.at(-1);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6 p-8">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="glass-panel h-[344px] rounded-xl border border-[var(--border)]" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-8">
@@ -66,8 +84,14 @@ export function TelemetryPage() {
       </div>
 
       <div className="glass-panel rounded-xl border border-[var(--border)] p-6">
-        <div className="mb-4 text-sm font-semibold text-[var(--text-bright)]">
-          Temperature &amp; Pressure — {ASSET_CODE}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-[var(--text-bright)]">
+            Temperature &amp; Pressure — {ASSET_CODE}
+          </div>
+          <div className="flex items-center gap-4 text-[11px] text-[var(--text-tertiary)]">
+            <ChartLegendEntry color="var(--severity-high)" label="Temperature (°C)" />
+            <ChartLegendEntry color="var(--accent)" label="Pressure (bar)" />
+          </div>
         </div>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={chartData}>
@@ -121,5 +145,14 @@ export function TelemetryPage() {
         </ResponsiveContainer>
       </div>
     </div>
+  );
+}
+
+function ChartLegendEntry({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden className="h-[2px] w-3.5 rounded-full" style={{ background: color }} />
+      {label}
+    </span>
   );
 }

@@ -372,6 +372,34 @@ client's source IP - pymodbus's single-shared-context server model
 doesn't expose per-connection info to `setValues()` without deeper
 protocol-layer surgery. Documented, not silently missing.
 
+## Dashboard: Audit Log page + loading/polish pass
+
+The dashboard's frontend caught up to Milestone 15 and picked up a
+round of UI fixes that applied across the whole app, not just one
+page:
+
+- **Audit Log page** (`/audit-log`) - filterable by action/resource
+  type, polled every 4s (no live WebSocket push for audit entries by
+  design - see the page's own comment on why extending
+  `backend/broadcaster.py` for one monitoring page isn't worth the
+  coupling yet). Rows with details expand in place to show the raw
+  JSON, with a copy-to-clipboard button. Newly-arrived rows (since the
+  last poll) get a brief accent-tinted flash - fast attack, slow decay
+  - so a fresh entry is noticeable without needing a toast.
+- **Loading skeletons everywhere a table fetches data.** Real gap:
+  Assets and Alerts tracked no loading state at all before this - an
+  empty result and "still fetching" rendered identically. `TableSkeleton`
+  (shimmer bars, deterministically varied widths) and `StatCardSkeleton`
+  now cover Overview, Live Telemetry, Assets, Alerts, and Audit Log.
+- **Per-asset-type icons** in the Assets table (Cpu/Droplet/Pump/
+  Thermometer/Gauge, mirroring `db/models.py`'s `AssetType` enum) and a
+  **color-key legend** on the Live Telemetry chart (temperature vs.
+  pressure line color).
+
+```bash
+cd frontend && npm run build   # tsc -b && vite build - verified clean
+```
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

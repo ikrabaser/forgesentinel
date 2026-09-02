@@ -83,3 +83,20 @@ export interface IncidentAnalysis {
   recommended_actions: string[];
   created_at: string;
 }
+
+// Mirrors backend/schemas.py's AuditLogOut (Milestone 15).
+export type AuditAction =
+  | "ALERT_ACKNOWLEDGED"
+  | "ALERT_RESOLVED"
+  | "INCIDENT_ANALYSIS_REQUESTED"
+  | "MODBUS_WRITE";
+
+export interface AuditLogEntry {
+  id: number;
+  timestamp: string;
+  actor: string;
+  action: AuditAction | string; // string fallback: server-defined values may outpace this union
+  resource_type: string;
+  resource_id: string;
+  details: Record<string, unknown> | null;
+}

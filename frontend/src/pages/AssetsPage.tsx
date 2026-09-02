@@ -2,21 +2,30 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { api } from "../api/client";
 import type { Asset } from "../api/types";
+import { AssetTypeIcon } from "../components/AssetTypeIcon";
 import { StatusDot } from "../components/StatusDot";
+import { TableSkeleton } from "../components/TableSkeleton";
 import { useLiveData } from "../state/LiveDataContext";
 import { timeAgo } from "../lib/time";
 
 export function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(true);
   const { telemetryByAsset } = useLiveData();
 
   useEffect(() => {
-    api.listAssets().then(setAssets);
+    api
+      .listAssets()
+      .then(setAssets)
+      .finally(() => setLoading(false));
   }, []);
 
   return (
     <div className="p-8">
       <div className="glass-panel overflow-hidden rounded-xl border border-[var(--border)]">
+        {loading ? (
+          <TableSkeleton rows={4} columns={6} leadingIconColumn />
+        ) : (
         <table className="w-full text-left text-sm">
           <thead className="border-b border-[var(--border)] text-[11px] uppercase tracking-wider text-[var(--text-dim)]">
             <tr>
@@ -50,7 +59,12 @@ export function AssetsPage() {
                   <td className="px-5 py-3 font-mono text-[var(--text-bright)]">
                     {asset.asset_code}
                   </td>
-                  <td className="px-5 py-3 text-[var(--text-dim)]">{asset.asset_type}</td>
+                  <td className="px-5 py-3 text-[var(--text-dim)]">
+                    <span className="inline-flex items-center gap-2">
+                      <AssetTypeIcon assetType={asset.asset_type} className="h-3.5 w-3.5 shrink-0 text-[var(--text-tertiary)]" />
+                      {asset.asset_type}
+                    </span>
+                  </td>
                   <td className="px-5 py-3 text-[var(--text-dim)]">{asset.protocol ?? "—"}</td>
                   <td className="px-5 py-3 font-mono text-[var(--text-dim)]">
                     {asset.ip_address ?? "—"}
@@ -61,6 +75,7 @@ export function AssetsPage() {
             })}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   );
