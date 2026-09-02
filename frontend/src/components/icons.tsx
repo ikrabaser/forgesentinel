@@ -143,6 +143,55 @@ export function InboxIcon(props: IconProps) {
   );
 }
 
+// Asset-type glyphs (AssetTypeIcon.tsx) - one per AssetType value from
+// db/models.py, so the Assets table reads at a glance instead of
+// requiring the "Type" column text to be read for every row.
+
+export function CpuIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="7" y="7" width="10" height="10" rx="1.5" />
+      <path d="M9.5 4v2.2M14.5 4v2.2M9.5 17.8V20M14.5 17.8V20M4 9.5h2.2M4 14.5h2.2M17.8 9.5H20M17.8 14.5H20" />
+    </svg>
+  );
+}
+
+export function DropletIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3.5c3 3.7 6 7.4 6 10.8a6 6 0 1 1-12 0c0-3.4 3-7.1 6-10.8z" />
+    </svg>
+  );
+}
+
+export function PumpIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="10.5" cy="12" r="6" />
+      <path d="M16 9.5 20 6M20 6v3.2M20 6h-3.2" />
+    </svg>
+  );
+}
+
+export function ThermometerIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 4.5a2 2 0 0 0-2 2v8.1a3.5 3.5 0 1 0 4 0V6.5a2 2 0 0 0-2-2z" />
+      <path d="M12 12.5v3" />
+    </svg>
+  );
+}
+
+export function GaugeIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4.5 15.5a7.5 7.5 0 1 1 15 0" />
+      <path d="M12 15.5 15 11" />
+      <path d="M12 15.5h.01" />
+    </svg>
+  );
+}
+
 /** Used only on the AI Incident Analyst trigger/panel (Milestone 14) -
  *  a distinct glyph so an AI-generated explanation is visually
  *  unmistakable from anything the system itself asserts as fact. */

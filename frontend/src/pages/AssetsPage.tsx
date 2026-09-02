@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { api } from "../api/client";
 import type { Asset } from "../api/types";
+import { AssetTypeIcon } from "../components/AssetTypeIcon";
 import { StatusDot } from "../components/StatusDot";
 import { TableSkeleton } from "../components/TableSkeleton";
 import { useLiveData } from "../state/LiveDataContext";
@@ -58,7 +59,12 @@ export function AssetsPage() {
                   <td className="px-5 py-3 font-mono text-[var(--text-bright)]">
                     {asset.asset_code}
                   </td>
-                  <td className="px-5 py-3 text-[var(--text-dim)]">{asset.asset_type}</td>
+                  <td className="px-5 py-3 text-[var(--text-dim)]">
+                    <span className="inline-flex items-center gap-2">
+                      <AssetTypeIcon assetType={asset.asset_type} className="h-3.5 w-3.5 shrink-0 text-[var(--text-tertiary)]" />
+                      {asset.asset_type}
+                    </span>
+                  </td>
                   <td className="px-5 py-3 text-[var(--text-dim)]">{asset.protocol ?? "—"}</td>
                   <td className="px-5 py-3 font-mono text-[var(--text-dim)]">
                     {asset.ip_address ?? "—"}
