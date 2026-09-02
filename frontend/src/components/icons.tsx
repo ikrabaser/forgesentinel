@@ -192,6 +192,15 @@ export function GaugeIcon(props: IconProps) {
   );
 }
 
+export function CopyIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="8.5" y="8.5" width="11" height="11" rx="1.5" />
+      <path d="M15.5 8.5V6.5A1.5 1.5 0 0 0 14 5H6a1.5 1.5 0 0 0-1.5 1.5V14A1.5 1.5 0 0 0 6 15.5h2" />
+    </svg>
+  );
+}
+
 /** Used only on the AI Incident Analyst trigger/panel (Milestone 14) -
  *  a distinct glyph so an AI-generated explanation is visually
  *  unmistakable from anything the system itself asserts as fact. */

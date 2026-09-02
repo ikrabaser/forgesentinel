@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { api } from "../api/client";
 import type { AuditLogEntry } from "../api/types";
 import { ActionBadge } from "../components/ActionBadge";
+import { CopyButton } from "../components/CopyButton";
 import { ChevronRightIcon, InboxIcon } from "../components/icons";
 import { TableSkeleton } from "../components/TableSkeleton";
 import { formatClockTime, timeAgo } from "../lib/time";
@@ -202,6 +203,9 @@ function AuditRow({
             transition={{ duration: 0.18 }}
           >
             <td colSpan={5} className="border-b border-[var(--border)] bg-black/20 px-5 py-3">
+              <div className="mb-2 flex justify-end">
+                <CopyButton value={JSON.stringify(entry.details, null, 2)} label="Copy JSON" />
+              </div>
               <pre className="overflow-x-auto font-mono text-[11px] leading-relaxed text-[var(--text-secondary)]">
                 {JSON.stringify(entry.details, null, 2)}
               </pre>
