@@ -9,6 +9,7 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { TelemetryPage } from "./pages/TelemetryPage";
 import { AlertsPage } from "./pages/AlertsPage";
 import { AssetsPage } from "./pages/AssetsPage";
+import { AuditLogPage } from "./pages/AuditLogPage";
 
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "/": {
@@ -26,6 +27,10 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "/assets": {
     title: "Assets",
     subtitle: "OT asset inventory and connectivity status",
+  },
+  "/audit-log": {
+    title: "Audit Log",
+    subtitle: "Who did what, when — API actions and Modbus write commands",
   },
 };
 
@@ -50,6 +55,7 @@ function AnimatedRoutes({ onMenuClick }: { onMenuClick: () => void }) {
               <Route path="/telemetry" element={<TelemetryPage />} />
               <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/assets" element={<AssetsPage />} />
+              <Route path="/audit-log" element={<AuditLogPage />} />
             </Routes>
           </motion.div>
         </AnimatePresence>

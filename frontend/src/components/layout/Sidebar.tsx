@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: "/telemetry", label: "Live Telemetry" },
   { to: "/alerts", label: "Alerts" },
   { to: "/assets", label: "Assets" },
+  { to: "/audit-log", label: "Audit Log" },
 ];
 
 const HEALTH_COPY: Record<SystemHealthState, { title: string; detail: string }> = {
