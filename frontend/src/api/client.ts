@@ -8,6 +8,7 @@ import type {
   Alert,
   AlertStatus,
   Asset,
+  AuditLogEntry,
   IncidentAnalysis,
   IncidentAnalysisRequest,
   IncidentAnalysisTaskStatus,
@@ -62,4 +63,15 @@ export const api = {
     getJson<IncidentAnalysisTaskStatus>(`/api/incidents/tasks/${taskId}`),
   listIncidentAnalyses: (alertId: number) =>
     getJson<IncidentAnalysis[]>(`/api/incidents?alert_id=${alertId}`),
+
+  // Milestone 15 - audit trail. Read-only by design (see
+  // backend/routers/audit_log.py's docstring) - there is no
+  // corresponding write function here on purpose.
+  listAuditLog: (params: { action?: string; resourceType?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.action) query.set("action", params.action);
+    if (params.resourceType) query.set("resource_type", params.resourceType);
+    query.set("limit", String(params.limit ?? 200));
+    return getJson<AuditLogEntry[]>(`/api/audit-log?${query.toString()}`);
+  },
 };
