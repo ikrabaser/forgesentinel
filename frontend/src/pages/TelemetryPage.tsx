@@ -9,29 +9,48 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../api/client";
-import type { Telemetry } from "../api/types";
+import type { Asset, Telemetry } from "../api/types";
 import { AnimatedNumber } from "../components/AnimatedNumber";
 import { StatCard } from "../components/StatCard";
 import { StatCardSkeleton } from "../components/StatCardSkeleton";
 import { useLiveData } from "../state/LiveDataContext";
 import { formatClockTime } from "../lib/time";
 
-const ASSET_CODE = "PLC-001"; // single-asset lab for now (see README)
+const FALLBACK_ASSET_CODE = "PLC-001"; // used only until the real asset list loads
 
 export function TelemetryPage() {
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [selectedAssetCode, setSelectedAssetCode] = useState<string>(FALLBACK_ASSET_CODE);
   const [history, setHistory] = useState<Telemetry[]>([]);
   const [loading, setLoading] = useState(true);
   const { telemetryByAsset, historyByAsset } = useLiveData();
 
+  // Milestone 16 (multi-asset): fetch the asset list once, then let
+  // the user switch which one's telemetry this page shows. Defaults
+  // to whichever asset comes back first - not hard-coded to PLC-001 -
+  // so a lab with a different first asset still opens on something
+  // real instead of an empty chart.
   useEffect(() => {
-    api
-      .listTelemetry(ASSET_CODE, 50)
-      .then((rows) => setHistory([...rows].reverse()))
-      .finally(() => setLoading(false));
+    api.listAssets().then((list) => {
+      setAssets(list);
+      if (list.length > 0) {
+        setSelectedAssetCode((current) =>
+          list.some((a) => a.asset_code === current) ? current : list[0].asset_code,
+        );
+      }
+    });
   }, []);
 
-  const liveHistory = historyByAsset[ASSET_CODE] ?? [];
-  const current = telemetryByAsset[ASSET_CODE];
+  useEffect(() => {
+    setLoading(true);
+    api
+      .listTelemetry(selectedAssetCode, 50)
+      .then((rows) => setHistory([...rows].reverse()))
+      .finally(() => setLoading(false));
+  }, [selectedAssetCode]);
+
+  const liveHistory = historyByAsset[selectedAssetCode] ?? [];
+  const current = telemetryByAsset[selectedAssetCode];
 
   // Merge REST snapshot with anything that arrived live since, oldest
   // first (chart reads left-to-right as time), deduped by id.
@@ -45,9 +64,29 @@ export function TelemetryPage() {
 
   const latest = current ?? chartData.at(-1);
 
+  const assetPicker = assets.length > 1 && (
+    <div className="flex flex-wrap items-center gap-2">
+      {assets.map((asset) => (
+        <button
+          key={asset.asset_code}
+          type="button"
+          onClick={() => setSelectedAssetCode(asset.asset_code)}
+          className={`rounded px-3 py-1.5 font-mono text-xs transition-colors duration-200 ${
+            asset.asset_code === selectedAssetCode
+              ? "bg-[var(--accent-dim)] text-[var(--accent)]"
+              : "text-[var(--text-tertiary)] hover:bg-white/[0.035]"
+          }`}
+        >
+          {asset.asset_code}
+        </button>
+      ))}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex flex-col gap-6 p-8">
+        {assetPicker}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <StatCardSkeleton key={i} />
@@ -60,6 +99,7 @@ export function TelemetryPage() {
 
   return (
     <div className="flex flex-col gap-6 p-8">
+      {assetPicker}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard
           label="Temperature"
@@ -86,7 +126,7 @@ export function TelemetryPage() {
       <div className="glass-panel rounded-xl border border-[var(--border)] p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm font-semibold text-[var(--text-bright)]">
-            Temperature &amp; Pressure — {ASSET_CODE}
+            Temperature &amp; Pressure — {selectedAssetCode}
           </div>
           <div className="flex items-center gap-4 text-[11px] text-[var(--text-tertiary)]">
             <ChartLegendEntry color="var(--severity-high)" label="Temperature (°C)" />

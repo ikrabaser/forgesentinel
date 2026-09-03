@@ -18,7 +18,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   },
   "/telemetry": {
     title: "Live Telemetry",
-    subtitle: "Streaming process data from PLC-001",
+    subtitle: "Streaming process data from your monitored assets",
   },
   "/alerts": {
     title: "Alerts",
