@@ -19,11 +19,19 @@ from collector.telemetry import TelemetryRecord
 
 logger = logging.getLogger("forgesentinel.collector.persistence")
 
-# Static description of PLC-001 for asset upserts. In a real system
-# this metadata would come from an engineering/commissioning record,
-# not be hard-coded - fine for our single-PLC lab, but a genuine
-# asset-inventory milestone would read this from configuration.
-ASSET_NAME = "PLC-001"
+# Generic defaults for asset upserts. In a real system this metadata
+# would come from an engineering/commissioning record, not be
+# hard-coded - fine for our lab, but a genuine asset-inventory
+# milestone would read this from configuration per asset.
+#
+# ASSET_NAME used to be the literal string "PLC-001" - harmless while
+# there was exactly one asset in the whole system, but a real bug the
+# moment a second collector instance runs for a different asset_id:
+# every asset upserted through this function would display the name
+# "PLC-001" regardless of which one it actually was. Milestone 16
+# (multi-asset) surfaced this immediately. Defaulting the name to the
+# asset's own code is the honest fallback until per-asset display
+# names exist.
 ASSET_TYPE = "PLC"
 ASSET_PROTOCOL = "Modbus TCP"
 
@@ -44,7 +52,7 @@ def make_persisting_callback(asset_ip: str) -> Callable[[TelemetryRecord], None]
 
             asset = asset_repo.upsert_seen(
                 asset_code=record.asset_id,
-                name=ASSET_NAME,
+                name=record.asset_id,
                 asset_type=ASSET_TYPE,
                 seen_at=record.timestamp,
                 protocol=ASSET_PROTOCOL,
