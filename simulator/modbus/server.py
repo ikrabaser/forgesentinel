@@ -41,7 +41,7 @@ from typing import Callable
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusServerContext, ModbusSlaveContext
 from pymodbus.server import StartAsyncTcpServer
 
-from simulator.loop import Plant
+from simulator.loop import Plant, PlantConfig
 from simulator.modbus import mapping
 from simulator.mqtt.payload import build_payload, topic_for
 from simulator.mqtt.publisher import MqttPublisher
@@ -194,6 +194,7 @@ async def run_server(
     asset_id: str = DEFAULT_ASSET_ID,
     publish_mqtt: bool = True,
     on_write: WriteCallback | None = None,
+    plant_config: PlantConfig | None = None,
 ) -> None:
     """
     Start the Modbus TCP server and the background plant-updater task
@@ -208,9 +209,15 @@ async def run_server(
     on_write=None by default (used by most tests) - no audit-log
     persistence happens unless the caller opts in, same reasoning as
     publish_mqtt=False.
+
+    plant_config=None runs the plant with every default this project
+    has used since Milestone 1 (see PlantConfig). Milestone 16
+    (multi-asset) passes a different profile (PLANT_PROFILES in
+    simulator/loop.py) so a second simulated asset is a genuinely
+    different process, not PLC-001 running on a different port.
     """
     context = build_context(on_write=on_write)
-    plant = Plant()
+    plant = Plant(plant_config)
 
     mqtt_publisher: MqttPublisher | None = None
     if publish_mqtt:
@@ -230,11 +237,34 @@ async def run_server(
 
 
 if __name__ == "__main__":
+    import os
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    # Milestone 16 (multi-asset): every knob a second instance of this
+    # process needs is an env var with a default that reproduces
+    # Milestone 1-15's single-asset behavior exactly, so `python -m
+    # simulator.modbus.server` with no environment configured is
+    # unchanged. Running a second simulated PLC is then just:
+    #   MODBUS_ASSET_ID=PLC-002 MODBUS_PORT=5021 PLANT_PROFILE=cooling-loop \
+    #     python -m simulator.modbus.server
+    asset_id = os.environ.get("MODBUS_ASSET_ID", DEFAULT_ASSET_ID)
+    host = os.environ.get("MODBUS_HOST", DEFAULT_HOST)
+    port = int(os.environ.get("MODBUS_PORT", str(DEFAULT_PORT)))
+    profile_name = os.environ.get("PLANT_PROFILE", "default")
+    try:
+        from simulator.loop import PLANT_PROFILES
+
+        plant_config = PLANT_PROFILES[profile_name]
+    except KeyError:
+        raise SystemExit(
+            f"Unknown PLANT_PROFILE '{profile_name}' - choices: {', '.join(PLANT_PROFILES)}"
+        )
+
     # Local import so this module stays importable/testable without a
     # database - same discipline as collector.py's __main__ (see its
     # comment for why). record_modbus_write is the only piece of this
@@ -242,6 +272,8 @@ if __name__ == "__main__":
     from simulator.modbus.audit import record_modbus_write
 
     def _on_write(fc: int, address: int, values: list) -> None:
-        record_modbus_write(DEFAULT_ASSET_ID, fc, address, values)
+        record_modbus_write(asset_id, fc, address, values)
 
-    asyncio.run(run_server(on_write=_on_write))
+    asyncio.run(
+        run_server(host=host, port=port, asset_id=asset_id, plant_config=plant_config, on_write=_on_write)
+    )

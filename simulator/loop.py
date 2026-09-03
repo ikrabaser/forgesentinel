@@ -58,6 +58,32 @@ class PlantConfig:
     pressure_max_safe: float = 4.0
 
 
+# Named PlantConfig presets, so a second (third, ...) simulated asset
+# can be launched with `PLANT_PROFILE=cooling-loop` instead of hand-
+# tuning half a dozen individual env vars. "default" matches every
+# threshold/capacity this project has used since Milestone 1 - adding
+# this registry changes no existing single-asset behavior.
+PLANT_PROFILES: dict[str, PlantConfig] = {
+    "default": PlantConfig(),
+    # A smaller, faster-cycling secondary process - a cooling water
+    # loop, not a reactor tank: lower operating temperature (cooling
+    # loops run cool by design), a tighter pressure ceiling (a smaller
+    # vessel tolerates less overpressure before it's a real problem),
+    # and a smaller/faster tank so its dynamics visibly differ from
+    # PLC-001's on a shared dashboard rather than reading as a clone.
+    "cooling-loop": PlantConfig(
+        tank_capacity=400.0,
+        tank_initial_level=200.0,
+        pump_flow_rate=25.0,
+        inlet_flow_rate=18.0,
+        initial_temperature=22.0,
+        initial_pressure=1.2,
+        temp_safe_threshold=45.0,
+        pressure_max_safe=2.5,
+    ),
+}
+
+
 class Plant:
     """Owns one tank + pump + sensor set + PLC = one simulated site."""
 
