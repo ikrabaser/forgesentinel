@@ -47,6 +47,15 @@ class PlantConfig:
     inlet_flow_rate: float = 25.0
     initial_temperature: float = 40.0
     initial_pressure: float = 1.5
+    # PLCController thresholds, pulled up to PlantConfig so a second
+    # simulated site (Milestone 16 - multi-asset) can behave like a
+    # genuinely different process, not a clone with a different name.
+    # Defaults match PLCController's own, so every existing caller
+    # (Milestone 1-15, all implicitly single-asset) is unaffected.
+    tank_high_threshold_percent: float = 90.0
+    tank_low_threshold_percent: float = 10.0
+    temp_safe_threshold: float = 90.0
+    pressure_max_safe: float = 4.0
 
 
 class Plant:
@@ -62,7 +71,12 @@ class Plant:
         self.pump = Pump(flow_rate=self.config.pump_flow_rate)
         self.temp_sensor = TemperatureSensor(temperature=self.config.initial_temperature)
         self.pressure_sensor = PressureSensor(pressure=self.config.initial_pressure)
-        self.plc = PLCController()
+        self.plc = PLCController(
+            tank_high_threshold_percent=self.config.tank_high_threshold_percent,
+            tank_low_threshold_percent=self.config.tank_low_threshold_percent,
+            temp_safe_threshold=self.config.temp_safe_threshold,
+            pressure_max_safe=self.config.pressure_max_safe,
+        )
 
         self.tick_count = 0
         # Last PLC decision, kept around so external readers (e.g. the
