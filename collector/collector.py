@@ -139,6 +139,8 @@ def _make_detecting_callback(engine, alert_sink) -> TelemetryCallback:
 
 
 if __name__ == "__main__":
+    import os
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -155,20 +157,36 @@ if __name__ == "__main__":
     from detection.engine import build_default_engine
     from detection.persistence import make_persisting_alert_sink
 
+    # Milestone 16 (multi-asset): every knob a second collector
+    # instance needs is an env var defaulted to reproduce Milestone
+    # 3-15's single-collector behavior exactly. Running the collector
+    # for the PLC-002 example in simulator/modbus/server.py's own
+    # __main__ comment is then:
+    #   COLLECTOR_ASSET_ID=PLC-002 COLLECTOR_PORT=5021 COLLECTOR_METRICS_PORT=9101 \\
+    #     python -m collector.collector
+    target_host = os.environ.get("COLLECTOR_HOST", "127.0.0.1")
+    target_port = int(os.environ.get("COLLECTOR_PORT", "5020"))
+    asset_id = os.environ.get("COLLECTOR_ASSET_ID", DEFAULT_ASSET_ID)
+    # Distinct default per likely-second-instance so two collectors
+    # started with only COLLECTOR_ASSET_ID/COLLECTOR_PORT set don't
+    # also collide on the metrics port by accident.
+    metrics_port = int(os.environ.get("COLLECTOR_METRICS_PORT", "9100"))
+
     # Milestone 11: expose forgesentinel_modbus_requests_total /
     # forgesentinel_collector_errors_total on their own tiny HTTP
     # server for Prometheus to scrape - separate from anything the
     # collector loop itself is doing.
-    start_metrics_server(port=9100)
+    start_metrics_server(port=metrics_port)
 
     engine = build_default_engine(expected_poll_interval_seconds=DEFAULT_POLL_SECONDS)
 
     run_collector(
-        host="127.0.0.1",
-        port=5020,
+        host=target_host,
+        port=target_port,
+        asset_id=asset_id,
         on_telemetry=_compose(
             log_telemetry,
-            make_persisting_callback(asset_ip="127.0.0.1"),
+            make_persisting_callback(asset_ip=target_host),
             _make_detecting_callback(engine, make_persisting_alert_sink()),
         ),
     )

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { api } from "../api/client";
-import type { Alert, AlertSeverity } from "../api/types";
+import type { Alert, AlertSeverity, Asset } from "../api/types";
 import { useLiveData } from "../state/LiveDataContext";
 import { SeverityBadge } from "./SeverityBadge";
 import { BellIcon, CloseIcon, InboxIcon } from "./icons";
@@ -27,13 +27,23 @@ const SEVERITY_DOT_COLOR: Record<AlertSeverity, string> = {
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const { liveAlerts } = useLiveData();
   const containerRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     api.listAlerts(undefined, PANEL_ALERTS_SHOWN * 3).then(setRecentAlerts);
+    api.listAssets().then(setAssets);
   }, []);
+
+  // Same multi-asset gap as AlertsPage: Alert only carries the
+  // numeric asset_id, not the human-readable code.
+  const assetCodeById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const asset of assets) map.set(asset.id, asset.asset_code);
+    return map;
+  }, [assets]);
 
   useEffect(() => {
     if (!open) return;
@@ -144,8 +154,11 @@ export function NotificationCenter() {
                         {timeAgo(alert.created_at)}
                       </span>
                     </div>
-                    <div className="mt-1.5 text-[13px] text-[var(--text-primary)]">
-                      {alert.title}
+                    <div className="mt-1.5 flex items-center gap-2 text-[13px] text-[var(--text-primary)]">
+                      <span>{alert.title}</span>
+                      <span className="shrink-0 rounded border border-[var(--border-strong)] px-1.5 py-0.5 font-mono text-[9.5px] text-[var(--text-tertiary)]">
+                        {assetCodeById.get(alert.asset_id) ?? `#${alert.asset_id}`}
+                      </span>
                     </div>
                     <div className="mt-0.5 line-clamp-1 text-[12px] text-[var(--text-secondary)]">
                       {alert.description}

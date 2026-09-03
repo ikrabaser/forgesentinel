@@ -400,6 +400,62 @@ page:
 cd frontend && npm run build   # tsc -b && vite build - verified clean
 ```
 
+## Milestone 16: Multi-asset simulation
+
+Still fully simulated - this doesn't connect to real hardware. What it
+does: the whole stack scales past one hard-coded PLC-001, and a real
+bug that hard-coding caused gets fixed along the way.
+
+A real bug this surfaced: `collector/persistence.py`'s `ASSET_NAME`
+was the literal string `"PLC-001"`, harmless with exactly one asset in
+the system, wrong the moment a second one exists - every asset would
+display the name "PLC-001" regardless of which it actually was. Now
+defaults to the asset's own code.
+
+`PLANT_PROFILES` (`simulator/loop.py`) lets a second simulated asset be
+a genuinely different process, not a PLC-001 clone on a different
+port - `cooling-loop` runs smaller/faster, cooler, with a tighter
+pressure ceiling. Both the Modbus server and the collector read their
+target/asset/port from environment variables now (defaulted to
+reproduce single-asset behavior exactly):
+
+```bash
+# Terminal 1-3: PLC-001, exactly as every earlier milestone
+python -m simulator.modbus.server
+python -m collector.collector
+python -m uvicorn backend.main:app --reload
+
+# Terminal 4-5: PLC-002, a second simulated asset
+MODBUS_ASSET_ID=PLC-002 MODBUS_PORT=5021 PLANT_PROFILE=cooling-loop \
+  python -m simulator.modbus.server
+COLLECTOR_ASSET_ID=PLC-002 COLLECTOR_PORT=5021 COLLECTOR_METRICS_PORT=9101 \
+  python -m collector.collector
+```
+
+The Live Telemetry page picks up a tab picker automatically once more
+than one asset exists - verified live switching between PLC-001 and
+PLC-002 correctly swaps the stat cards, chart data, and Y-axis scale.
+
+**`scripts/seed_history.py`** backfills realistic historical telemetry
++ alerts so the dashboard doesn't open empty on a fresh database -
+using the SAME `Plant`/`PLCController`/`DetectionEngine` machinery the
+live system runs, fast-forwarded and stamped with past timestamps, not
+random numbers standing in for real ones:
+
+```bash
+python -m scripts.seed_history --asset PLC-001 --hours 48 --reset
+python -m scripts.seed_history --asset PLC-002 --profile cooling-loop --hours 48 --reset
+```
+
+Two real bugs its own test suite caught before either was committed:
+(1) the detection engine was only evaluated once per 5-minute
+*persisted* sample instead of every simulated tick, which let a full
+excursion-and-recovery cycle happen between evaluations and inflated a
+48h backfill to 73 alerts instead of the ~1 the real hysteresis-fixed
+system produces; (2) the backfill loop's boundary could stamp its last
+window's telemetry with timestamps technically in the future. Both
+fixed; `tests/test_seed_history.py` asserts against regressing either.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

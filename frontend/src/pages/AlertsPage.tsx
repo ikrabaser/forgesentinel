@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { Alert, AlertStatus } from "../api/types";
+import type { Alert, AlertStatus, Asset } from "../api/types";
 import { IncidentAnalysisPanel } from "../components/IncidentAnalysisPanel";
 import { SeverityBadge } from "../components/SeverityBadge";
 import { TableSkeleton } from "../components/TableSkeleton";
@@ -12,6 +12,7 @@ const FILTERS: (AlertStatus | "ALL")[] = ["ALL", "OPEN", "ACKNOWLEDGED", "RESOLV
 
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<AlertStatus | "ALL">("OPEN");
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -23,7 +24,20 @@ export function AlertsPage() {
       .listAlerts(undefined, 200)
       .then(setAlerts)
       .finally(() => setLoading(false));
+    api.listAssets().then(setAssets);
   }, []);
+
+  // Milestone 16 (multi-asset): Alert only carries the numeric
+  // asset_id (matches the DB foreign key, see api/types.ts), not the
+  // human-readable asset_code - with more than one asset now
+  // possible, a row that doesn't say WHICH asset it's about is a real
+  // usability gap, not a cosmetic one. Built once per assets fetch,
+  // not per row.
+  const assetCodeById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const asset of assets) map.set(asset.id, asset.asset_code);
+    return map;
+  }, [assets]);
 
   const combined = useMemo(() => {
     const byId = new Map<number, Alert>();
@@ -95,6 +109,9 @@ export function AlertsPage() {
                       {alert.description}
                     </div>
                   </div>
+                  <span className="shrink-0 rounded border border-[var(--border-strong)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]">
+                    {assetCodeById.get(alert.asset_id) ?? `asset #${alert.asset_id}`}
+                  </span>
                   <span className="shrink-0 font-mono text-[10px] text-[var(--text-tertiary)]">
                     {alert.rule_id}
                   </span>
