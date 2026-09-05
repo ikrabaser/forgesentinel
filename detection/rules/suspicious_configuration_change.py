@@ -1,50 +1,71 @@
 """
-Rule 005 - SUSPICIOUS_CONFIGURATION_CHANGE. DELIBERATELY NOT
-IMPLEMENTED YET. This module exists as a placeholder so the rule
-numbering/file layout matches the spec, and so nobody mistakes its
-absence for an oversight - it's a documented, deliberate scope
-decision.
+Rule 005 - SUSPICIOUS_CONFIGURATION_CHANGE. Implemented as of
+Milestone 15+, which built the exact prerequisite this rule was
+blocked on (see the git history of this file for the original,
+longer explanation of why it couldn't be built honestly before then).
 
     unexpected PLC configuration/register modification
     -> SUSPICIOUS_CONFIGURATION_CHANGE
 
-Why we can't build this honestly yet:
+What changed: Milestone 15 added a write-audit path on the Modbus
+server (AuditingSlaveContext, simulator/modbus/server.py) that
+reliably distinguishes a genuine external write (FC06/FC16) from the
+simulator's own internal tick updates (which always use fc=3/1). That
+answers the question this rule was previously missing an answer to:
+"was this write ours, or someone else's?" Our own collector NEVER
+writes to PLC registers - it only reads (see collector/modbus_client.py)
+- so by construction, any FC06/FC16 request this server observes came
+from something other than our own collector. There is still no
+"legitimate external writer" (e.g. an engineering workstation) modeled
+in this lab, so today every observed write is unauthorized; if one is
+ever added, this rule's logic is exactly where that allow-list would
+be checked before raising.
 
-    Modbus TCP, as implemented in Milestone 2, has NO built-in
-    authentication or authorization. This is not a bug in our
-    simulator - it's a faithful reproduction of the real protocol's
-    biggest well-known security weakness: any client that can reach
-    the TCP port can send a "write single register" (FC06) or "write
-    multiple registers" (FC16) request, and our server (like most real
-    PLCs on unsegmented OT networks) will honor it with no check on
-    who's asking.
-
-    To detect a "suspicious" configuration change, a rule needs to
-    distinguish a LEGITIMATE write (nobody currently writes to our
-    registers except the simulator's own internal updater loop) from
-    an UNAUTHORIZED one (an external Modbus client writing directly to
-    a register, bypassing the PLC's control logic entirely). We have
-    not yet built:
-
-      1. Any mechanism that allows/models a legitimate external write
-         at all (e.g. an "engineering workstation" that's supposed to
-         be able to push setpoint changes).
-      2. Any way for the collector/detection engine to observe WHO
-         wrote a value or WHEN, as opposed to just what the current
-         value is - Modbus registers only ever expose current state,
-         not write history or origin.
-
-    Faking this rule (e.g. "alert if the pump-state register doesn't
-    match what we expect" using knowledge only the simulator's
-    internals have) would violate the same rule this whole detection
-    engine has to respect in the collector layer: never assume access
-    you would not actually have in a real deployment.
-
-When this gets built for real, it will need at minimum: a write-audit
-path on the Modbus server (logging every FC06/16 request with its
-source), and a definition of what a legitimate writer looks like, to
-compare against - a natural companion to Milestone 12
-(network security integration / Wireshark/Suricata/Zeek), since a
-Modbus write instrumentation layer is itself a form of security
-monitoring.
+Why this rule has NO debouncing, unlike Rules 001-003:
+    Debouncing (see detection/rules/base.py) exists for continuous
+    values that can hover near a threshold, producing many rapid
+    "crossings" for what's really one ongoing condition. A Modbus
+    write is not that - it is a discrete, instantaneous event with a
+    clear start and end. Two separate writes are two separate security
+    events, each worth its own alert, not "the same excursion still
+    ongoing." There is no state to track between calls.
 """
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from detection.models import Alert, AlertSeverity
+
+RULE_ID = "RULE-005"
+
+_FUNCTION_CODE_NAMES = {6: "WRITE_SINGLE_REGISTER", 16: "WRITE_MULTIPLE_REGISTERS"}
+
+
+def build_suspicious_configuration_change_alert(
+    asset_id: str,
+    function_code: int,
+    address: int,
+    values: list,
+    timestamp: datetime,
+) -> Alert:
+    """
+    Build the Alert for one observed external Modbus write. Pure
+    function - no I/O, no debounce state - so every call produces
+    exactly one Alert, matching the "each write is its own event"
+    reasoning above.
+    """
+    function_name = _FUNCTION_CODE_NAMES.get(function_code, str(function_code))
+    return Alert(
+        rule_id=RULE_ID,
+        asset_id=asset_id,
+        severity=AlertSeverity.CRITICAL,
+        title="Suspicious configuration change",
+        description=(
+            f"An external Modbus client sent a {function_name} (FC{function_code}) "
+            f"request to register address {address} with values={list(values)}. "
+            f"This collector never writes to PLC registers, so this write bypassed "
+            f"the PLC's own control logic entirely."
+        ),
+        created_at=timestamp,
+    )
