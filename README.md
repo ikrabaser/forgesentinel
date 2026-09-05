@@ -502,6 +502,12 @@ an env var, there's no rotation, no hashing at rest, and no
 authorization/roles - only authentication (who are you), not what
 you're allowed to do. A real deployment needs considerably more.
 
+**Verified live:** started the API with `API_KEYS=alice:testkey123`.
+`POST /api/alerts/{id}/acknowledge` returned 401 with no header AND
+with a wrong key, 200 with the right one, `GET /api/alerts` stayed 200
+with no header at all, and the resulting `/api/audit-log` entry showed
+`"actor": "alice"` - a real name, not `"api-client"`.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial
