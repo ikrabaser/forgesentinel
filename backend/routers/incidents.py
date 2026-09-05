@@ -22,6 +22,7 @@ from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from backend.auth import get_current_actor
 from backend.dependencies import get_db
 from backend.schemas import (
     IncidentAnalysisOut,
@@ -34,16 +35,14 @@ from tasks.incident_analysis import analyze_incident_task
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
-# See backend/routers/alerts.py's _API_ACTOR for why this is a literal
-# placeholder rather than a real principal.
-_API_ACTOR = "api-client"
-
 
 @router.post("/analyze/{alert_id}", response_model=IncidentAnalysisRequestOut, status_code=202)
-def request_incident_analysis(alert_id: int, db: Session = Depends(get_db)) -> IncidentAnalysisRequestOut:
+def request_incident_analysis(
+    alert_id: int, db: Session = Depends(get_db), actor: str = Depends(get_current_actor)
+) -> IncidentAnalysisRequestOut:
     task = analyze_incident_task.delay(alert_id)
     AuditLogRepository(db).record(
-        actor=_API_ACTOR,
+        actor=actor,
         action="INCIDENT_ANALYSIS_REQUESTED",
         resource_type="alert",
         resource_id=str(alert_id),
