@@ -65,10 +65,15 @@ class DetectionEngine:
 
 def build_default_engine(expected_poll_interval_seconds: float = 1.0) -> DetectionEngine:
     """
-    The engine configuration ForgeSentinel actually runs with:
-    Rules 001-003 (Rule 004 as the heartbeat rule; Rule 005
-    intentionally excluded - see
-    detection/rules/suspicious_configuration_change.py).
+    The engine configuration ForgeSentinel actually runs with: Rules
+    001-003 (Rule 004 as the heartbeat rule). Rule 005
+    (SUSPICIOUS_CONFIGURATION_CHANGE) is implemented but deliberately
+    does NOT run through this engine - it has no telemetry to react to
+    and no heartbeat-style timer to poll on. It's event-driven from an
+    entirely different trigger: simulator/modbus/audit.py calls
+    build_suspicious_configuration_change_alert() directly, the moment
+    AuditingSlaveContext observes a genuine external Modbus write. See
+    detection/rules/suspicious_configuration_change.py.
     """
     return DetectionEngine(
         telemetry_rules=[

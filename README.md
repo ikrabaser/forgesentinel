@@ -63,8 +63,8 @@ Endpoints (interactive docs at `http://127.0.0.1:8000/docs`):
 Rule-based detection over live telemetry. Rules 001-003 react to
 incoming telemetry; Rule 004 (device offline) is heartbeat-driven -
 see `detection/rules/device_offline.py`. Rule 005 (suspicious
-configuration change) is intentionally NOT implemented yet - see
-`detection/rules/suspicious_configuration_change.py` for why.
+configuration change) is event-driven from the Modbus server's write
+path, not telemetry - see the "Rule 005" note under Milestone 15 below.
 
 ```bash
 python -m simulator.modbus.server   # terminal 1
@@ -240,12 +240,12 @@ live-sniffing (Docker Desktop on Windows can't see host loopback
 traffic - see `network-security/README.md` for the full reasoning).
 
 This is deliberately the network-layer complement to Rule 005
-(`detection/rules/suspicious_configuration_change.py`), which
-documented exactly why it couldn't be built at the application layer:
-Modbus has no authentication, so any client's write command is
-inherently suspicious here - a rule the network layer can express
-trivially (`modbus: access write`) without needing to know what value
-was written or why.
+(`detection/rules/suspicious_configuration_change.py`, implemented in
+Milestone 15/later): Modbus has no authentication, so any client's
+write command is inherently suspicious here - a signal the network
+layer can express trivially (`modbus: access write`) without needing
+any application-layer state at all, independent of whether the
+application-layer rule is watching.
 
 ```bash
 python network-security/generate_pcaps.py
@@ -345,14 +345,29 @@ Two sources feed it:
    an honest placeholder, not a real principal, until a future auth
    milestone).
 2. **Modbus write requests** - `detection/rules/suspicious_configuration_change.py`
-   (Rule 005, still intentionally unimplemented) named this exact gap
-   as its prerequisite: *"a write-audit path on the Modbus server,
-   logging every FC06/16 request"*. `AuditingSlaveContext`
-   (`simulator/modbus/server.py`) now does exactly that - and only
-   that: our own simulator writes registers every tick using fc=3/1
-   (the "read" function codes, by pymodbus convention), so only a
-   genuine external FC06/FC16 write ever reaches the audit log, never
-   our own internal state refresh.
+   named this exact gap as its own prerequisite: *"a write-audit path
+   on the Modbus server, logging every FC06/16 request"*.
+   `AuditingSlaveContext` (`simulator/modbus/server.py`) does exactly
+   that - and only that: our own simulator writes registers every tick
+   using fc=3/1 (the "read" function codes, by pymodbus convention), so
+   only a genuine external FC06/FC16 write ever reaches the audit log,
+   never our own internal state refresh.
+
+**Rule 005 (SUSPICIOUS_CONFIGURATION_CHANGE) is now implemented**,
+built directly on top of this audit path: every genuine external write
+`AuditingSlaveContext` observes also raises a CRITICAL alert via
+`simulator/modbus/audit.py` - our collector never writes, so any write
+is unauthorized by construction. Unlike Rules 001-003, it has no
+debounce state: a write is a discrete event, not a continuous value
+that can hover near a threshold, so every occurrence gets its own
+alert. It runs on its own event trigger, not through
+`DetectionEngine`/`build_default_engine` - see that function's
+docstring for why.
+
+**Verified live:** sent a real `write_register(0, 9999)` - it produced
+exactly one `RULE-005` CRITICAL "Suspicious configuration change"
+alert visible at `GET /api/alerts`, alongside the corresponding
+`MODBUS_WRITE` audit-log entry.
 
 ```bash
 python -m simulator.modbus.server   # now audits genuine writes
