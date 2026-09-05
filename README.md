@@ -471,6 +471,37 @@ system produces; (2) the backfill loop's boundary could stamp its last
 window's telemetry with timestamps technically in the future. Both
 fixed; `tests/test_seed_history.py` asserts against regressing either.
 
+## Simple auth
+
+Opt-in API-key authentication (`backend/auth.py`) for the mutating
+endpoints only - `POST /api/alerts/{id}/acknowledge`, `/resolve`, and
+`POST /api/incidents/analyze/{id}`. Every `GET` stays open, with or
+without auth configured.
+
+```bash
+# .env
+API_KEYS=alice:changeme-alice-key,bob:changeme-bob-key
+```
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/alerts/1/acknowledge \
+  -H "Authorization: Bearer changeme-alice-key"
+```
+
+With `API_KEYS` unset (the default since Milestone 15), every caller
+is still attributed to `"api-client"` and no header is required at
+all - this doesn't break the zero-config experience the rest of this
+lab has always had. Setting it is what turns `AuditLog.actor` into a
+real, distinct principal per caller instead of one shared placeholder
+string, directly closing the gap `db/models.py`'s `AuditLog` docstring
+and this project's own Milestone 15 work documented.
+
+This is intentionally minimal for a local educational lab, not a
+production security posture: keys are compared as plain strings from
+an env var, there's no rotation, no hashing at rest, and no
+authorization/roles - only authentication (who are you), not what
+you're allowed to do. A real deployment needs considerably more.
+
 ## Security boundary
 
 This is a local training lab only. It never targets real industrial

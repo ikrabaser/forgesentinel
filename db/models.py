@@ -162,11 +162,11 @@ class AuditLog(Base):
     a log an application can quietly edit isn't one.
 
     Two distinct sources feed this table:
-      - API actions (actor="api-client" for now - there is no
-        authentication yet, so we cannot honestly attribute an action
-        to a specific human/service identity beyond "the API was
-        called". A future auth milestone would replace this literal
-        string with a real principal.)
+      - API actions (actor is whatever backend/auth.py's
+        get_current_actor resolved for the request - a real per-caller
+        principal if the operator configured API_KEYS, or the
+        "api-client" placeholder if they haven't, since auth is
+        opt-in for this local lab - see backend/auth.py's docstring.)
       - Modbus write commands observed by the PLC simulator (actor=
         "modbus-client" - see simulator/modbus/server.py's
         AuditingSlaveContext for how genuine external writes (FC06/16)
